@@ -8,29 +8,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let uploadedImage = null;
 
-    // ステータスバーの定義 (IMG_3672.webpから精密に再サンプリング)
+    // ステータスバーの定義 (ご提供いただいた最新のRGB値に更新)
     const STATUS_BARS = [
-        { name: 'HP', color: { r: 245, g: 214, b: 108 } },    // #F5D66C
-        { name: '攻撃', color: { r: 195, g: 73, b: 108 } },    // #C3496C
-        { name: '魔攻', color: { r: 81, g: 130, b: 192 } },    // #5182C0
-        { name: '防御', color: { r: 219, g: 153, b: 96 } },    // #DB9960
-        { name: '魔防', color: { r: 137, g: 199, b: 230 } },   // #89C7E6
-        { name: '敏捷', color: { r: 102, g: 246, b: 208 } }    // #66F6D0
+        { name: 'HP', color: { r: 252, g: 227, b: 126 } },    // #FCE37E
+        { name: '攻撃', color: { r: 214, g: 107, b: 135 } },    // #D66B87
+        { name: '魔攻', color: { r: 85, g: 134, b: 200 } },    // #5586C8
+        { name: '防御', color: { r: 237, g: 170, b: 118 } },    // #EDAA76
+        { name: '魔防', color: { r: 140, g: 210, b: 236 } },   // #8CD2EC
+        { name: '敏捷', color: { r: 115, g: 251, b: 211 } }    // #73FBD3
     ];
 
     const COLOR_TOLERANCE = 30; // RGB値の二乗誤差のしきい値 (一般的な色比較用)
 
-    // !!! 更新された外枠の線色 !!!
-    const FRAME_LINE_COLOR = { r: 255, g: 251, b: 241 }; // #FFFBF1 (ご提供いただいたほぼ白の色)
+    // 外枠の線色
+    const FRAME_LINE_COLOR = { r: 255, g: 251, b: 241 }; // #FFFBF1
 
-    // バーの背景色（未到達部分の色）(再サンプリング)
+    // バーの背景色（未到達部分の色）
     // タイプ1: 攻撃、防御、敏捷のバーの背景
     const BAR_BACKGROUND_TYPE1 = { r: 69, g: 50, b: 24 }; // #453218
     // タイプ2: HP、魔攻、魔防のバーの背景
     const BAR_BACKGROUND_TYPE2 = { r: 86, g: 67, b: 35 }; // #564323
 
-    // !!! 更新された余白の背景色 !!!
-    const GENERAL_BACKGROUND_COLOR = { r: 69, g: 52, b: 26 }; // #45341A (ご提供いただいた色)
+    // 余白の背景色
+    const GENERAL_BACKGROUND_COLOR = { r: 69, g: 52, b: 26 }; // #45341A
 
     // HPバーの未到達部分のグラデーション開始色 (最も左側の色)
     const HP_UNDERSCORE_GRADIENT_START_COLOR = { r: 86, g: 67, b: 35 }; // BAR_BACKGROUND_TYPE2と同じ
@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const PIXEL_THRESHOLD_FOR_FRAME_LINE = FRAME_SCAN_X_HALF_WIDTH * 2 * 0.5; // スキャン範囲の50%以上がフレーム色ならOK
 
         // Y_top_frame の検出 (上から下へ)
-        let foundBackgroundEnd = false;
+        let foundBackgroundEnd = false; // 背景が終わったことを示すフラグ
         for (let y = 0; y < height; y++) {
             let currentLineFramePixels = 0;
             let currentLineBgPixels = 0;
@@ -153,12 +153,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // まず背景色ではないピクセルが現れたら、背景の終わりと見なす
-            if (!foundBackgroundEnd && currentLineBgPixels < (FRAME_SCAN_X_HALF_WIDTH * 2 * 0.9)) { // 90%以上が背景色でなければ
+            // 画像の端からスキャンして、一般的な背景色ではないピクセルが一定割合現れたら、そこが背景の終わり
+            if (!foundBackgroundEnd && currentLineBgPixels < (FRAME_SCAN_X_HALF_WIDTH * 2 * 0.9)) { 
                 foundBackgroundEnd = true;
             }
 
-            // 背景色の終わりが見つかり、かつフレーム色のピクセルが一定数あれば、そこがY_top_frame
+            // 背景の終わりが見つかり、かつフレーム色のピクセルが一定数あれば、そこがY_top_frame
             if (foundBackgroundEnd && currentLineFramePixels > PIXEL_THRESHOLD_FOR_FRAME_LINE) {
                 Y_top_frame = y;
                 break;
@@ -299,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- 5. 各ステータスバーの右端 (`currentX`) の検出とパーセンテージ計算 ---
         const finalResults = [];
         const BACKGROUND_TRANSITION_TOLERANCE = COLOR_TOLERANCE * 1.5; 
-        const BAR_COLOR_DETECTION_TOLERANCE = COLOR_TOLERANCE * 2; // バー本体の色検出の許容誤差をさらに緩和 (60)
+        const BAR_COLOR_DETECTION_TOLERANCE = COLOR_TOLERANCE * 1.3; // バー本体の色検出の許容誤差を再調整 (39)
         
         const CONSECUTIVE_NON_BAR_PIXELS_THRESHOLD = 5; 
 
