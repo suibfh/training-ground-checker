@@ -298,7 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const finalResults = [];
         const BACKGROUND_TRANSITION_TOLERANCE = COLOR_TOLERANCE * 1.5; 
         const BAR_COLOR_DETECTION_TOLERANCE = 80; // バー本体と縁の色の検出をより寛容にする
-        const CONSECUTIVE_NON_TARGET_PIXELS_THRESHOLD = 10; // バーの終端判断をより厳しくする
+        const CONSECUTIVE_NON_TARGET_PIXELS_THRESHOLD = 15; // バーの終端判断をより厳しくする
 
         // スキャン範囲をstartXの少し左からに調整し、バーの開始点の縁も考慮できるようにする
         const SCAN_BAR_COLOR_X_START = Math.max(0, startX - 5); 
