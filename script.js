@@ -137,115 +137,130 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- メインの画像解析ロジック ---
 
+// script.js の analyzeImage 関数内を以下のように修正・置き換え
+
     function analyzeImage() {
         if (!uploadedImage) {
             resultsDiv.innerHTML = '<p>画像をアップロードしてください。</p>';
             return;
         }
 
-        resultsDiv.innerHTML = '<p>解析中...</p>'; // 解析中のメッセージ
+        resultsDiv.innerHTML = '<p>解析中...</p>';
         const imageData = ctx.getImageData(0, 0, statusCanvas.width, statusCanvas.height);
         const width = imageData.width;
         const height = imageData.height;
 
         let startX = null; // バーの開始点 (0%の基準線)
         let maxX = null;   // バーの最大長終点 (100%の基準線)
-        const detectedBars = [];
-
-        // 1. バーのY座標（垂直方向の位置）の特定と基準線の検出
+        
+        // 1. 基準線 (startX, maxX) の検出
         // 画像のY座標をサンプリングして、バーが存在しそうな行を探し、基準線を検出
-        // 例えば、画像の高さの20%から80%の範囲で、20ピクセルごとにサンプリング
-        const sampleStepY = 20;
-        let potentialBarYs = []; // 各バーのY座標の候補
+        // 例えば、画像の高さの20%から80%の範囲で、10ピクセルごとにサンプリング
+        const sampleYRangeStart = Math.floor(height * 0.2);
+        const sampleYRangeEnd = Math.floor(height * 0.8);
+        const sampleStepYForLines = 10; // 基準線検出のためのY軸サンプリング間隔
 
-        for (let y = Math.floor(height * 0.2); y < height * 0.8; y += sampleStepY) {
+        let startXCandidates = {}; // startXの候補とその出現回数
+        let maxXCandidates = {};   // maxXの候補とその出現回数
+
+        for (let y = sampleYRangeStart; y < sampleYRangeEnd; y += sampleStepYForLines) {
             // 細い白い垂直線 (0の基準線) を左から右へ検出
+            // 線の太さは1ピクセルと仮定
             const foundStartX = findVerticalLine(imageData, y, WHITE_COLOR, 1, 'leftToRight');
             if (foundStartX !== null) {
-                if (startX === null) {
-                    startX = foundStartX;
-                } else {
-                    // 複数の行で検出されたstartXがほぼ同じであれば採用
-                    if (Math.abs(startX - foundStartX) > 5) { // 5ピクセル以上のずれは無視
-                        continue;
-                    }
-                }
+                startXCandidates[foundStartX] = (startXCandidates[foundStartX] || 0) + 1;
             }
 
             // 太い白い垂直線 (100%の基準線) を右から左へ検出
-            const foundMaxX = findVerticalLine(imageData, y, WHITE_COLOR, 3, 'rightToLeft'); // 太い線なのでminWidthを3程度に
+            // 線の太さは3ピクセル以上と仮定
+            const foundMaxX = findVerticalLine(imageData, y, WHITE_COLOR, 3, 'rightToLeft');
             if (foundMaxX !== null) {
-                if (maxX === null) {
-                    maxX = foundMaxX;
-                } else {
-                    // 複数の行で検出されたmaxXがほぼ同じであれば採用
-                    if (Math.abs(maxX - foundMaxX) > 5) { // 5ピクセル以上のずれは無視
-                        continue;
-                    }
-                }
-            }
-
-            // ここで、各バーの特定の色を探し、バーが存在するY座標の候補を収集
-            // startXとmaxXの間でSTATUS_BARSに定義された色のピクセルを検出
-            for (let i = 0; i < STATUS_BARS.length; i++) {
-                const barColor = STATUS_BARS[i].color;
-                // startXからmaxXの範囲で、そのバーの色が存在するかを確認
-                let foundBarColor = false;
-                for (let x = (startX || 0) + 5; x < (maxX || width) - 5; x += 3) { // ざっくりとした範囲でサンプリング
-                    const pixel = getPixelColor(imageData, x, y);
-                    if (isColorClose(pixel, barColor, COLOR_TOLERANCE)) {
-                        foundBarColor = true;
-                        break;
-                    }
-                }
-                if (foundBarColor && !potentialBarYs.includes(y)) {
-                    potentialBarYs.push(y);
-                }
+                // 右から左に走査しているので、検出されたXは線の左端。
+                // 100%基準線は「外枠の右側」なので、検出されたXがそのままmaxXとなる。
+                maxXCandidates[foundMaxX] = (maxXCandidates[foundMaxX] || 0) + 1;
             }
         }
 
-        // 検出された基準線がなければエラー
+        // 最も多く検出されたstartXとmaxXを選ぶ
+        startX = Object.keys(startXCandidates).reduce((a, b) => startXCandidates[a] > startXCandidates[b] ? a : b, null);
+        maxX = Object.keys(maxXCandidates).reduce((a, b) => maxXCandidates[a] > maxXCandidates[b] ? a : b, null);
+
+        // 検出されたX座標を数値に変換
+        if (startX !== null) startX = parseInt(startX, 10);
+        if (maxX !== null) maxX = parseInt(maxX, 10);
+        
+        console.log("Detected startX:", startX, "Detected maxX:", maxX);
+
         if (startX === null || maxX === null || maxX <= startX) {
-            resultsDiv.innerHTML = '<p style="color: red;">基準線が見つかりませんでした。トリミングや画像の品質を確認してください。</p>';
+            resultsDiv.innerHTML = '<p style="color: red;">基準線（左右の白い線）が見つかりませんでした。トリミングや画像の品質を確認してください。</p>';
             return;
         }
 
-        // 基準線が見つかったら、バーのY座標を特定してソート
-        // Y座標が近いものをグループ化したり、等間隔であることを利用して特定
-        potentialBarYs.sort((a, b) => a - b);
-        // 仮に、一番上のバーから6つのY座標を特定する（より堅牢なロジックは別途必要）
+        // 2. 各ステータスバーのY座標の特定
         const definiteBarYs = [];
-        if (potentialBarYs.length >= STATUS_BARS.length) {
-             // 最初のバーのY座標を特定し、そこから等間隔で残りのバーのY座標を推測する
-             // ただし、この部分のロジックは非常にデリケートで、画像のUIによって大きく変わります。
-             // ここでは簡易的に、検出されたY座標の中から、各バーに最も近いY座標を割り当てます。
-             // 実際には、バー間のピクセル間隔を特定するなどの工夫が必要。
-             // 一旦、検出された候補からSTATUS_BARS.length個を単純に選ぶ
-             for(let i=0; i < STATUS_BARS.length && i < potentialBarYs.length; i++) {
-                 definiteBarYs.push(potentialBarYs[i]);
-             }
-             // もし候補が少なければ、画像の上部から推定するなどのフォールバックが必要
-             if (definiteBarYs.length < STATUS_BARS.length) {
-                  // Fallback: Y座標をハードコードに近い形で設定 (画像中央を基準に)
-                  const baseH = height * 0.3; // 仮の開始Y座標
-                  const barHeightInterval = 50; // バー間の仮のピクセル間隔
-                  for(let i=0; i < STATUS_BARS.length; i++) {
-                      definiteBarYs.push(Math.floor(baseH + (i * barHeightInterval)));
-                  }
-                  console.warn("バーのY座標の検出が不十分でした。仮の値を使用します。");
-             }
+        const checkedYs = new Set(); // 重複チェック用
 
-        } else {
-            resultsDiv.innerHTML = '<p style="color: red;">ステータスバーのY座標の特定に失敗しました。画像を確認してください。</p>';
-            return;
+        // startXとmaxXの間のX座標で、各バーの色を縦方向に探す
+        // バーが始まる可能性のあるY座標の範囲
+        const barDetectYStart = Math.floor(height * 0.2); // 画像上部からの割合で調整
+        const barDetectYEnd = Math.floor(height * 0.9);   // 画像下部からの割合で調整
+        const barDetectStepY = 5; // Y軸方向の走査間隔 (細かく)
+
+        // バーの内部をサンプリングするX座標 (startXとmaxXの間の中央付近)
+        const sampleXForBarY = Math.floor(startX + (maxX - startX) / 2);
+        
+        // デバッグ用: 走査X座標が有効範囲内か確認
+        if (sampleXForBarY < 0 || sampleXForBarY >= width) {
+             console.error("sampleXForBarY が画像範囲外です:", sampleXForBarY);
+             resultsDiv.innerHTML = '<p style="color: red;">内部エラー: バーの中心を特定できません。</p>';
+             return;
         }
 
+        for (let y = barDetectYStart; y < barDetectYEnd; y += barDetectStepY) {
+            // すでに検出済みのY座標に近い場合はスキップ
+            let isTooCloseToDetected = false;
+            for (const existingY of definiteBarYs) {
+                if (Math.abs(y - existingY) < 20) { // バー間の最小間隔を20ピクセルと仮定（調整必要）
+                    isTooCloseToDetected = true;
+                    break;
+                }
+            }
+            if (isTooCloseToDetected) continue;
 
-        // 2. 各ステータスバーの右端 (`currentX`) の検出とパーセンテージ計算
+            // バーの中央付近のX座標で、各バーの色を探す
+            const pixel = getPixelColor(imageData, sampleXForBarY, y);
+
+            for (const barInfo of STATUS_BARS) {
+                if (isColorClose(pixel, barInfo.color, COLOR_TOLERANCE)) {
+                    // バーの色が見つかったら、そのY座標を確定Y座標として追加
+                    definiteBarYs.push(y);
+                    break; // このY座標でバーが見つかったら次のY座標へ
+                }
+            }
+
+            // 必要な数のバーが見つかったらループを終了
+            if (definiteBarYs.length >= STATUS_BARS.length) {
+                break;
+            }
+        }
+        
+        // 検出されたY座標をソート（念のため）
+        definiteBarYs.sort((a, b) => a - b);
+
+        console.log("Detected Bar Ys:", definiteBarYs);
+
+        if (definiteBarYs.length < STATUS_BARS.length) {
+            resultsDiv.innerHTML = '<p style="color: red;">ステータスバーのY座標の特定に失敗しました。すべてのバーが見つからないか、バー間の間隔が広すぎる可能性があります。</p>';
+            return;
+        }
+        // 見つかったバーのY座標が多い場合は、上からSTATUS_BARS.length個だけ採用
+        definiteBarYs.splice(STATUS_BARS.length);
+
+
+        // 3. 各ステータスバーの右端 (`currentX`) の検出とパーセンテージ計算
         const finalResults = [];
         for (let i = 0; i < STATUS_BARS.length; i++) {
             const barInfo = STATUS_BARS[i];
-            // 各バーのY座標はdefiniteBarYsから取得
             const barY = definiteBarYs[i]; 
             let currentX = startX; // 初期値はバーの開始点
 
@@ -256,7 +271,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentX = x; // バーの色が続く限りcurrentXを更新
                 } else {
                     // バーの色が途切れたら終了
-                    break;
+                    // ここで、背景色との差が明確に出るようにCOLOR_TOLERANCEを調整する必要がある
+                    // または、バーの色ではないことを確認する別のロジック
+                    break; 
                 }
             }
 
