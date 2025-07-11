@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let uploadedImage = null;
 
     const STATUS_BARS = [
-        { name: 'HP', color: { r: 252, g: 227, b: 125 } },    // #FCE37D
+        { name: 'HP', color: { r: 252, g: 227, b: 125 } },    // #FCE37D (HPバー本体色)
         { name: '攻撃', color: { r: 214, g: 107, b: 135 } },   // #D66B87
         { name: '魔攻', color: { r: 85, g: 134, b: 200 } },    // #5586C8
         { name: '防御', color: { r: 237, g: 170, b: 118 } },   // #EDAA76
@@ -19,12 +19,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const COLOR_TOLERANCE = 30; // RGB値の二乗誤差のしきい値
 
-    const WHITE_COLOR = { r: 255, g: 253, b: 254 }; // #FFFDFE (補助線)
+    // バーの左端の「｜」と未到達部分の「＿」の線
+    const LEFT_BORDER_LINE_COLOR = { r: 255, g: 255, b: 241 }; // #FFFFF1
 
+    // バーの背景色 (タイプ1と2)
     const BACKGROUND_COLOR_TYPE1 = { r: 70, g: 51, b: 25 }; // #463319 (攻撃、防御、敏捷の背景)
     const BACKGROUND_COLOR_TYPE2 = { r: 88, g: 69, b: 36 }; // #584524 (HP、魔攻、魔防の背景)
 
-    const HP_GRADIENT_START_COLOR = { r: 73, g: 58, b: 31 }; // #493A1F
+    // バー領域外の一般的な背景色
+    const BACKGROUND_COLOR_GENERAL = { r: 75, g: 56, b: 33 }; // #4B3821
+
+    // 未到達部分の「＿＿」内部のグラデーション色
+    const HP_GRADIENT_START_COLOR_UNDERSCORE = { r: 88, g: 69, b: 36 }; // #584524 (HP,魔攻,魔防の背景色と同じ)
+    const HP_GRADIENT_END_COLOR_UNDERSCORE = { r: 86, g: 66, b: 37 }; // #564225
 
     /**
      * 指定された座標のピクセルのRGB値を取得
@@ -52,11 +59,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * ピクセルがどちらかの背景色に近いか判定
+     * ピクセルがどちらかの背景色に近いか判定 (バー内部の背景色)
      */
-    function isColorCloseToAnyBackground(pixelColor, tolerance) {
+    function isColorCloseToBarBackground(pixelColor, tolerance) {
         return isColorClose(pixelColor, BACKGROUND_COLOR_TYPE1, tolerance) || 
                isColorClose(pixelColor, BACKGROUND_COLOR_TYPE2, tolerance);
+    }
+
+    /**
+     * ピクセルが一般的な背景色に近いか判定 (バー領域外の背景色)
+     */
+    function isColorCloseToGeneralBackground(pixelColor, tolerance) {
+        return isColorClose(pixelColor, BACKGROUND_COLOR_GENERAL, tolerance);
     }
 
     imageUpload.addEventListener('change', (event) => {
@@ -100,43 +114,53 @@ document.addEventListener('DOMContentLoaded', () => {
         let startX = null;
         let maxX = null;
         
-        // 1. 基準線 (startX, maxX) の検出
+        // 1. HPバーのY座標を暫定的に特定 (startX, maxX検出のために必要)
+        // バーの左端の「｜」線の色に近いピクセルがあるY座標を探す
         const HP_BAR_DETECT_Y_START = Math.floor(height * 0.1); 
         const HP_BAR_DETECT_Y_END = Math.floor(height * 0.3);   
         let tempHpBarY = null;
 
-        const tempSampleX = Math.floor(width / 2); 
-        const HP_COLOR_TOLERANCE_FOR_Y_DETECT = 40; 
+        // まず、バーの左端の「｜」線を見つけるために、画像の上部からY座標をスキャン
+        // Y座標は、バーの中央より少し下あたりが「＿」線を見つけやすいかもしれません。
+        // ここでは一旦、バーのY座標検出と同じサンプリングX位置を使います
+        const tempSampleXForYDetect = Math.floor(width * 0.1); // 画像の左端から少し入ったあたり
 
         for (let y = HP_BAR_DETECT_Y_START; y < HP_BAR_DETECT_Y_END; y++) {
-            const pixel = getPixelColor(imageData, tempSampleX, y);
-            if (isColorClose(pixel, STATUS_BARS[0].color, HP_COLOR_TOLERANCE_FOR_Y_DETECT) ||
-                isColorClose(pixel, HP_GRADIENT_START_COLOR, HP_COLOR_TOLERANCE_FOR_Y_DETECT * 1.5)) { 
+            const pixel = getPixelColor(imageData, tempSampleXForYDetect, y);
+            // バーのY座標は、バー本体の色で探す
+            if (isColorClose(pixel, STATUS_BARS[0].color, COLOR_TOLERANCE)) {
                 tempHpBarY = y;
                 break;
             }
         }
         
         if (tempHpBarY === null) {
-            resultsDiv.innerHTML = '<p style="color: red;">HPバーのY座標を特定できませんでした。画像を確認してください。</p>';
+            resultsDiv.innerHTML = '<p style="color: red;">HPバーのY座標を特定できませんでした。画像を正しくトリミングしているか確認してください。</p>';
             console.error("HP bar Y not found for startX/maxX detection.");
             return;
         }
 
-        const X_SCAN_TOLERANCE = COLOR_TOLERANCE * 1.5; 
-
+        // 2. startX の検出: 「｜」線のX座標
+        // 検出したHPバーのY座標を使い、左から「｜」線 (`LEFT_BORDER_LINE_COLOR`) を探す
+        const START_LINE_SCAN_TOLERANCE = COLOR_TOLERANCE; // 「｜」線の検出は厳密に
         for (let x = 0; x < width; x++) {
             const pixel = getPixelColor(imageData, x, tempHpBarY);
-            if (!isColorCloseToAnyBackground(pixel, X_SCAN_TOLERANCE)) {
+            if (isColorClose(pixel, LEFT_BORDER_LINE_COLOR, START_LINE_SCAN_TOLERANCE)) {
                 startX = x;
                 break;
             }
         }
 
+        // 3. maxX の検出: バーが100%の場合の右端
+        // バーのY座標 (tempHpBarY) を使って、右から一般的な背景色 (`BACKGROUND_COLOR_GENERAL`) ではない最初のピクセルを探す
+        // これがバーが描かれうる最右端とします。
+        const MAX_X_SCAN_TOLERANCE = COLOR_TOLERANCE * 2; // 背景色との境界は少し緩めに
         for (let x = width - 1; x >= 0; x--) {
             const pixel = getPixelColor(imageData, x, tempHpBarY);
-            if (!isColorCloseToAnyBackground(pixel, X_SCAN_TOLERANCE)) {
+            if (!isColorCloseToGeneralBackground(pixel, MAX_X_SCAN_TOLERANCE)) {
                 maxX = x;
+                // 見つけたMAX_Xの右側に数ピクセルの余白があればさらに正確
+                // 例: maxX = x + 5;
                 break;
             }
         }
@@ -144,14 +168,16 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("Detected startX:", startX, "Detected maxX:", maxX);
 
         if (startX === null || maxX === null || maxX <= startX) {
-            resultsDiv.innerHTML = '<p style="color: red;">バーの左右の基準点が見つかりませんでした。画像を正しくトリミングしているか、バーが極端に短い場合は調整が必要かもしれません。</p>';
+            resultsDiv.innerHTML = '<p style="color: red;">バーの左右の基準点が見つかりませんでした。画像を正しくトリミングしているか確認してください。</p>';
             return;
         }
 
-        // 2. 各ステータスバーのY座標の特定
+        // 4. 各ステータスバーのY座標の特定
         const detectedBarYColors = []; 
 
-        const sampleXForBarY = Math.floor(startX + (maxX - startX) * 0.25); 
+        // バー本体の単色部分をサンプリングするX座標
+        // 「｜」線のすぐ右側 (`startX + 10` など) が最も安全
+        const sampleXForBarY = startX + 10; 
 
         if (sampleXForBarY < 0 || sampleXForBarY >= width) {
              console.error("sampleXForBarY が画像範囲外です:", sampleXForBarY, "width:", width);
@@ -196,7 +222,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 detectedBarYColors.push({ y: y, barInfo: closestBarInfo });
             }
 
-            if (detectedBarYColors.length >= STATUS_BARS.length * 2) { 
+            // 全てのバーのY座標が見つかったら、それ以上スキャンしない
+            if (detectedBarYColors.length >= STATUS_BARS.length) { 
                 break;
             }
         }
@@ -249,41 +276,55 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // 3. 各ステータスバーの右端 (`currentX`) の検出とパーセンテージ計算
+        // 5. 各ステータスバーの右端 (`currentX`) の検出とパーセンテージ計算
         const finalResults = [];
         const BACKGROUND_TRANSITION_TOLERANCE = COLOR_TOLERANCE * 1.5; 
-        
-        // ***** NO_BAR_COLOR_THRESHOLD の値を調整 *****
-        const NO_BAR_COLOR_THRESHOLD = 3; // 8から3に減らす
+        const GRADIENT_COLOR_TOLERANCE = COLOR_TOLERANCE * 1.5; // グラデーション色の許容範囲
+
+        // バーの終点と判断する際の連続する非バー色のピクセル数
+        const NO_BAR_COLOR_THRESHOLD = 1; // 1ピクセルでもバーの色でなければ終わりを検討
 
         for (let i = 0; i < STATUS_BARS.length; i++) {
             const barInfo = STATUS_BARS[i];
             const barY = actualDefiniteBarYs[i]; 
-            let currentX = startX;
+            let currentX = startX; // 開始X座標を初期値とする
             
             const isType1Background = (barInfo.name === '攻撃' || barInfo.name === '防御' || barInfo.name === '敏捷');
-            const targetBackgroundColor = isType1Background ? BACKGROUND_COLOR_TYPE1 : BACKGROUND_COLOR_TYPE2;
+            const targetBackgroundColor = isType1Background ? BACKGROUND_COLOR_TYPE1 : BACKGROUND_COLOR_TYPE2; // バー内部の背景色
 
-            let noBarColorOrGradationCount = 0; 
+            let consecutiveNonBarPixels = 0; 
 
-            for (let x = startX; x <= maxX; x++) {
+            for (let x = startX + 1; x <= maxX; x++) { // startXの次のピクセルからスキャン開始
                 const pixel = getPixelColor(imageData, x, barY);
                 
                 const isMainBarColor = isColorClose(pixel, barInfo.color, COLOR_TOLERANCE);
-                const isBackgroundColor = isColorClose(pixel, targetBackgroundColor, BACKGROUND_TRANSITION_TOLERANCE);
-                const isGradientColor = isColorClose(pixel, HP_GRADIENT_START_COLOR, COLOR_TOLERANCE * 1.5);
+                const isGradientUnderscoreColorStart = isColorClose(pixel, HP_GRADIENT_START_COLOR_UNDERSCORE, GRADIENT_COLOR_TOLERANCE);
+                const isGradientUnderscoreColorEnd = isColorClose(pixel, HP_GRADIENT_END_COLOR_UNDERSCORE, GRADIENT_COLOR_TOLERANCE);
+                const isGeneralBackground = isColorCloseToGeneralBackground(pixel, BACKGROUND_TRANSITION_TOLERANCE);
+                const isBarInternalBackground = isColorCloseToBarBackground(pixel, BACKGROUND_TRANSITION_TOLERANCE);
 
-                // メインの色、またはグラデーションの色である間はバーが続いていると判断
-                if (isMainBarColor || isGradientColor) {
+
+                if (isMainBarColor) {
+                    // バー本体の色が検出されたら、バーが続いている
                     currentX = x;
-                    noBarColorOrGradationCount = 0;
-                } else if (!isBackgroundColor) {
-                    // バーの色でも背景色でもない、中間の色（グラデーションの端など）
-                    currentX = x; 
-                    noBarColorOrGradationCount = 0;
+                    consecutiveNonBarPixels = 0;
+                } else if (barInfo.name === 'HP' && (isGradientUnderscoreColorStart || isGradientUnderscoreColorEnd)) {
+                    // HPバーで、かつ未到達部分のグラデーション色の場合
+                    currentX = x;
+                    consecutiveNonBarPixels = 0;
+                } else if (isGeneralBackground || isBarInternalBackground) {
+                    // 一般的な背景色か、バー内部の背景色に近い場合
+                    consecutiveNonBarPixels++;
+                    if (consecutiveNonBarPixels >= NO_BAR_COLOR_THRESHOLD) {
+                        // バーの終わりと判断
+                        break; 
+                    }
                 } else {
-                    noBarColorOrGradationCount++;
-                    if (noBarColorOrGradationCount >= NO_BAR_COLOR_THRESHOLD) {
+                    // 上記のどの色にも一致しない、その他のノイズや遷移色の場合
+                    // ここではバーの終わりと判断せず、consecutiveNonBarPixels を増やす
+                    // ただし、非常に短いバーの終わりを誤認識しないよう慎重に
+                    consecutiveNonBarPixels++;
+                    if (consecutiveNonBarPixels >= NO_BAR_COLOR_THRESHOLD) {
                         break; 
                     }
                 }
