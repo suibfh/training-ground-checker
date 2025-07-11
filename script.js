@@ -20,9 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const COLOR_TOLERANCE = 30; // RGB値の二乗誤差のしきい値 (一般的な色比較用)
 
-    // バーの左端「｜」の線色 (再サンプリング)
-    const LEFT_BORDER_LINE_COLOR = { r: 255, g: 255, b: 240 }; // #FFFFF0
-
     // バー領域の外枠の線色 (IMG_3672.webpから再サンプリング)
     const FRAME_LINE_COLOR = { r: 224, g: 207, b: 195 }; // #E0CFD3
 
@@ -47,6 +44,12 @@ document.addEventListener('DOMContentLoaded', () => {
         '魔防': 0.74,
         '敏捷': 0.90
     };
+
+    // startX (バーの左端「｜」) が全体のフレーム幅に対してどのくらいの割合の位置にあるか (IMG_3672.webpから測定)
+    const START_X_POSITION_RATIO = 0.06; 
+
+    // maxX (バーの最大右端) が全体のフレーム幅に対してどのくらいの割合の位置にあるか (IMG_3672.webpから測定)
+    const MAX_X_POSITION_RATIO = 0.96;
 
     /**
      * 指定された座標のピクセルのRGB値を取得
@@ -123,75 +126,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const width = imageData.width;
         const height = imageData.height;
 
-        let startX = null; // バーの共通の開始X座標（「｜」線のX座標）
-        let maxX = null;   // バーの共通の最大X座標（100%時の右端）
-        let cropRightX = width; // ステータス表示領域の右端
-        let cropBottomY = height; // ステータス表示領域の下端
+        let Y_top_frame = null; // 全体のバー領域の上枠Y座標
+        let Y_bottom_frame = null; // 全体のバー領域の下枠Y座標
+        let X_left_frame = null; // 全体のバー領域の左枠X座標
+        let X_right_frame = null; // 全体のバー領域の右枠X座標
 
-        // --- 1. ステータス表示領域の右端と下端を特定 (外枠の背景色からの遷移で検出) ---
-        // Y_top_frameとY_bottom_frameが特定できれば、これらのクロップは必須ではないが、安全のため残す
-        for (let x = width - 1; x >= Math.floor(width * 0.7); x--) { 
-            let isGeneralBgLine = true;
-            for (let y = Math.floor(height * 0.2); y < Math.floor(height * 0.8); y+=5) { 
-                const pixel = getPixelColor(imageData, x, y);
-                if (!isColorClose(pixel, GENERAL_BACKGROUND_COLOR, COLOR_TOLERANCE * 1.5)) {
-                    isGeneralBgLine = false;
-                    break;
-                }
-            }
-            if (!isGeneralBgLine) {
-                cropRightX = x + 1; 
-                break;
-            }
-        }
-        
-        for (let y = height - 1; y >= Math.floor(height * 0.7); y--) { 
-            let isGeneralBgLine = true;
-            for (let x = Math.floor(width * 0.2); x < Math.floor(width * 0.8); x+=5) { 
-                const pixel = getPixelColor(imageData, x, y);
-                if (!isColorClose(pixel, GENERAL_BACKGROUND_COLOR, COLOR_TOLERANCE * 1.5)) {
-                    isGeneralBgLine = false;
-                    break;
-                }
-            }
-            if (!isGeneralBgLine) {
-                cropBottomY = y + 1; 
-                break;
-            }
-        }
-
-        // --- 2. バーの左端（「｜」線）の共通X座標 `startX` を特定 ---
-        const SCAN_X_FOR_START_LINE_LEFT = Math.floor(width * 0.05); 
-        const SCAN_X_FOR_START_LINE_RIGHT = Math.floor(width * 0.2); 
-
-        for (let x = SCAN_X_FOR_START_LINE_LEFT; x < SCAN_X_FOR_START_LINE_RIGHT; x++) {
-            let consecutiveLinesFound = 0;
-            // Y軸スキャン範囲を狭め、HPバーのY座標付近のみを狙う
-            for (let y = Math.floor(height * 0.05); y < Math.floor(height * 0.15); y++) { 
-                const pixel = getPixelColor(imageData, x, y);
-                if (isColorClose(pixel, LEFT_BORDER_LINE_COLOR, COLOR_TOLERANCE * 2.5)) { 
-                    consecutiveLinesFound++;
-                } else {
-                    consecutiveLinesFound = 0; 
-                }
-                if (consecutiveLinesFound >= 3) { 
-                    startX = x;
-                    break;
-                }
-            }
-            if (startX !== null) break;
-        }
-        
-        if (startX === null) {
-            resultsDiv.innerHTML = '<p style="color: red;">バーの左端の基準点が見つかりませんでした。画像を正しくトリミングしているか、または画像のバーが想定外の形式でないか確認してください。</p>';
-            return;
-        }
-
-        // --- 3. ステータスバー領域の上下のフレームY座標を特定 ---
-        let Y_top_frame = null;
-        let Y_bottom_frame = null;
+        // --- 1. ステータスバー領域の上下のフレームY座標を特定 ---
         const FRAME_SCAN_X_CENTER = Math.floor(width * 0.5); // 中央付近のXでフレームを探す
-        const FRAME_SCAN_X_HALF_WIDTH = Math.floor(width * 0.1); // スキャンするX範囲の半分
+        const FRAME_SCAN_X_HALF_WIDTH = Math.floor(width * 0.1); // スキャンするX範囲の半分 (左右10%ずつ)
+        const PIXEL_THRESHOLD_FOR_FRAME = FRAME_SCAN_X_HALF_WIDTH * 2 * 0.5; // スキャン範囲の50%以上がフレーム色ならOK
 
         // Y_top_frame の検出 (上から下へ)
         for (let y = 0; y < height; y++) {
@@ -205,8 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     frameLinePixels++;
                 }
             }
-            // 一定数のピクセルがフレーム色であればフレームとみなす
-            if (frameLinePixels > (FRAME_SCAN_X_HALF_WIDTH * 2 * 0.5)) { // スキャン範囲の50%以上
+            if (frameLinePixels > PIXEL_THRESHOLD_FOR_FRAME) {
                 Y_top_frame = y;
                 break;
             }
@@ -223,25 +165,86 @@ document.addEventListener('DOMContentLoaded', () => {
                     frameLinePixels++;
                 }
             }
-            if (frameLinePixels > (FRAME_SCAN_X_HALF_WIDTH * 2 * 0.5)) { 
+            if (frameLinePixels > PIXEL_THRESHOLD_FOR_FRAME) { 
                 Y_bottom_frame = y;
                 break;
             }
         }
+
+        if (Y_top_frame === null || Y_bottom_frame === null || Y_bottom_frame <= Y_top_frame + 20) { 
+            resultsDiv.innerHTML = '<p style="color: red;">ステータスバー領域の上下フレームが見つかりませんでした。画像を正しくトリミングしているか、または画像のUIが想定外の形式でないか確認してください。</p>';
+            console.error("Failed to detect Y_top_frame or Y_bottom_frame.");
+            return;
+        }
         
-        console.log("Detected cropRightX:", cropRightX, "Detected cropBottomY:", cropBottomY);
-        console.log("Detected startX:", startX);
+        const totalFrameHeight = Y_bottom_frame - Y_top_frame;
         console.log("Detected Y_top_frame:", Y_top_frame, "Detected Y_bottom_frame:", Y_bottom_frame);
 
-        if (Y_top_frame === null || Y_bottom_frame === null || Y_bottom_frame <= Y_top_frame + 20) { // 最小フレーム高を20pxとする
-            resultsDiv.innerHTML = '<p style="color: red;">ステータスバー領域の上下フレームが見つかりませんでした。画像を正しくトリミングしているか、または画像のUIが想定外の形式でないか確認してください。</p>';
+        // --- 2. ステータスバー領域の左右のフレームX座標を特定 ---
+        const FRAME_SCAN_Y_CENTER = Math.floor(Y_top_frame + totalFrameHeight / 2); // 上下フレーム中央のYでスキャン
+        const FRAME_SCAN_Y_HALF_HEIGHT = Math.floor(totalFrameHeight * 0.1); // スキャンするY範囲の半分 (上下10%ずつ)
+        const PIXEL_THRESHOLD_FOR_FRAME_VERTICAL = FRAME_SCAN_Y_HALF_HEIGHT * 2 * 0.5; // スキャン範囲の50%以上がフレーム色ならOK
+
+
+        // X_left_frame の検出 (左から右へ)
+        for (let x = 0; x < width; x++) {
+            let frameLinePixels = 0;
+            for (let y = FRAME_SCAN_Y_CENTER - FRAME_SCAN_Y_HALF_HEIGHT; y <= FRAME_SCAN_Y_CENTER + FRAME_SCAN_Y_HALF_HEIGHT; y++) {
+                const pixel = getPixelColor(imageData, x, y);
+                if (isColorClose(pixel, FRAME_LINE_COLOR, COLOR_TOLERANCE * 1.5) || 
+                    isColorClose(pixel, BAR_BACKGROUND_TYPE1, COLOR_TOLERANCE * 1.5) ||
+                    isColorClose(pixel, BAR_BACKGROUND_TYPE2, COLOR_TOLERANCE * 1.5)) {
+                    frameLinePixels++;
+                }
+            }
+            if (frameLinePixels > PIXEL_THRESHOLD_FOR_FRAME_VERTICAL) {
+                X_left_frame = x;
+                break;
+            }
+        }
+
+        // X_right_frame の検出 (右から左へ)
+        for (let x = width - 1; x >= 0; x--) {
+            let frameLinePixels = 0;
+            for (let y = FRAME_SCAN_Y_CENTER - FRAME_SCAN_Y_HALF_HEIGHT; y <= FRAME_SCAN_Y_CENTER + FRAME_SCAN_Y_HALF_HEIGHT; y++) {
+                const pixel = getPixelColor(imageData, x, y);
+                if (isColorClose(pixel, FRAME_LINE_COLOR, COLOR_TOLERANCE * 1.5) || 
+                    isColorClose(pixel, BAR_BACKGROUND_TYPE1, COLOR_TOLERANCE * 1.5) ||
+                    isColorClose(pixel, BAR_BACKGROUND_TYPE2, COLOR_TOLERANCE * 1.5)) {
+                    frameLinePixels++;
+                }
+            }
+            if (frameLinePixels > PIXEL_THRESHOLD_FOR_FRAME_VERTICAL) {
+                X_right_frame = x;
+                break;
+            }
+        }
+        
+        if (X_left_frame === null || X_right_frame === null || X_right_frame <= X_left_frame + 20) {
+            resultsDiv.innerHTML = '<p style="color: red;">ステータスバー領域の左右フレームが見つかりませんでした。画像を正しくトリミングしているか、または画像のUIが想定外の形式でないか確認してください。</p>';
+            console.error("Failed to detect X_left_frame or X_right_frame.");
             return;
         }
 
-        const totalFrameHeight = Y_bottom_frame - Y_top_frame;
-        const actualDefiniteBarYs = new Map();
+        const totalFrameWidth = X_right_frame - X_left_frame;
+        console.log("Detected X_left_frame:", X_left_frame, "Detected X_right_frame:", X_right_frame);
+        
+        // --- 3. バーの左端（「｜」線）の共通X座標 `startX` と 最大X座標 `maxX` を算出 ---
+        // Xフレームを基準に比率で算出
+        const startX = Math.round(X_left_frame + totalFrameWidth * START_X_POSITION_RATIO);
+        const maxX = Math.round(X_left_frame + totalFrameWidth * MAX_X_POSITION_RATIO);
 
-        // 各バーのY座標を比率で算出
+        console.log("Calculated startX (by ratio):", startX);
+        console.log("Calculated maxX (by ratio):", maxX);
+
+        if (startX >= maxX) { // 異常な値の場合のフォールバック
+            resultsDiv.innerHTML = '<p style="color: red;">バーの開始X座標が最大X座標よりも大きいか同じです。比率設定またはフレーム検出に問題がある可能性があります。</p>';
+            console.error("startX >= maxX. Check ratios or frame detection.");
+            return;
+        }
+
+        // --- 4. 各ステータスバーのY座標を比率で算出 ---
+        const actualDefiniteBarYs = new Map();
         for (const barInfo of STATUS_BARS) {
             const ratio = BAR_Y_POSITIONS_RATIO[barInfo.name];
             if (ratio !== undefined) {
@@ -252,28 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.warn(`Warning: Ratio not defined for bar: ${barInfo.name}`);
             }
         }
-        
         console.log("Calculated Bar Ys (by ratio):", Object.fromEntries(actualDefiniteBarYs));
-
-        // --- 4. バーの最大X座標 `maxX` を特定 ---
-        // Y_top_frameとY_bottom_frameの中央をスキャンYとする
-        const SCAN_Y_FOR_MAX_X = Math.floor(Y_top_frame + totalFrameHeight / 2); 
-        
-        for (let x = cropRightX - 1; x > startX; x--) {
-            const pixel = getPixelColor(imageData, x, SCAN_Y_FOR_MAX_X);
-            // バーの背景色、または一般的な背景色に切り替わる点をmaxXとする
-            if (isColorClose(pixel, GENERAL_BACKGROUND_COLOR, COLOR_TOLERANCE * 1.5) ||
-                isColorClose(pixel, BAR_BACKGROUND_TYPE1, COLOR_TOLERANCE * 1.5) ||
-                isColorClose(pixel, BAR_BACKGROUND_TYPE2, COLOR_TOLERANCE * 1.5)) {
-                maxX = x;
-                break;
-            }
-        }
-        if (maxX === null || maxX <= startX) {
-            maxX = cropRightX - 5; // 見つからなかった場合のフォールバック
-            if (maxX <= startX) maxX = startX + 100; // 最低限の長さを確保
-        }
-        console.log("Detected maxX:", maxX);
 
         if (actualDefiniteBarYs.size < STATUS_BARS.length || Array.from(actualDefiniteBarYs.values()).some(y => y === null)) {
             resultsDiv.innerHTML = `<p style="color: red;">ステータスバーのY座標の特定に失敗しました。すべてのバーが見つからないか、フレームの検出に問題がある可能性があります。</p><p style="color: red;">現在の検出数: ${Array.from(actualDefiniteBarYs.values()).filter(y => y !== null).length}/${STATUS_BARS.length}</p>`;
@@ -282,13 +264,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- 5. 各ステータスバーの右端 (`currentX`) の検出とパーセンテージ計算 ---
         const finalResults = [];
-        const BACKGROUND_TRANSITION_TOLERANCE = COLOR_TOLERANCE * 1.5; 
-        const GRADIENT_COLOR_TOLERANCE = COLOR_TOLERANCE * 1.5; 
+        const BACKGROUND_TRANSITION_TOLERANCE = COLOR_TOLERANCE * 1.5; // 45
+        const BAR_COLOR_DETECTION_TOLERANCE = COLOR_TOLERANCE * 1.5; // バー本体の色検出の許容誤差を緩和 (45)
+        
+        const CONSECUTIVE_NON_BAR_PIXELS_THRESHOLD = 5; // 連続非バーピクセル数を3から5に増加
 
-        const CONSECUTIVE_NON_BAR_PIXELS_THRESHOLD = 3; 
-
-        // バー本体の色サンプリング範囲を調整 (startX + 15 から startX + 40) はY座標特定用だったため、ここはパーセンテージ用に調整不要
-        // パーセンテージ計算は、バー本体の色が途切れるまでをカウントする
+        // バー本体の色サンプリング開始X座標 (startXのすぐ右から開始)
+        const SCAN_BAR_COLOR_X_START = startX + 2; 
+        const SCAN_BAR_COLOR_X_END_FOR_PERCENTAGE = maxX + 20; // 最大Xのさらに右までスキャンして終点を探す
 
         for (let i = 0; i < STATUS_BARS.length; i++) {
             const barInfo = STATUS_BARS[i];
@@ -298,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 continue;
             }
             
-            let currentX = startX; 
+            let currentX = startX; // デフォルトはstartX (0%の状態)
             
             let targetBackgroundColor = GENERAL_BACKGROUND_COLOR; 
             if (barInfo.name === '攻撃' || barInfo.name === '防御' || barInfo.name === '敏捷') {
@@ -308,31 +291,28 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             let consecutiveNonBarPixels = 0; 
-            const SCAN_BAR_COLOR_X_END_FOR_PERCENTAGE = maxX + 20; // 最大Xのさらに右までスキャン
 
-            for (let x = startX + 1; x <= SCAN_BAR_COLOR_X_END_FOR_PERCENTAGE; x++) { 
+            for (let x = SCAN_BAR_COLOR_X_START; x <= SCAN_BAR_COLOR_X_END_FOR_PERCENTAGE; x++) { 
                 const pixel = getPixelColor(imageData, x, barY);
                 
-                // バー本体の色、左端の線色（バーが短い場合、線が終点になる可能性）、HPの背景グラデーション色
-                const isMainBarColor = isColorClose(pixel, barInfo.color, COLOR_TOLERANCE);
-                const isUnderscoreLineColor = isColorClose(pixel, LEFT_BORDER_LINE_COLOR, COLOR_TOLERANCE); 
-                const isHPUnderscoreGradient = (barInfo.name === 'HP' && isColorClose(pixel, HP_UNDERSCORE_GRADIENT_START_COLOR, GRADIENT_COLOR_TOLERANCE));
+                // バー本体の色、HPの背景グラデーション色をチェック
+                const isMainBarColor = isColorClose(pixel, barInfo.color, BAR_COLOR_DETECTION_TOLERANCE);
+                const isHPUnderscoreGradient = (barInfo.name === 'HP' && isColorClose(pixel, HP_UNDERSCORE_GRADIENT_START_COLOR, BAR_COLOR_DETECTION_TOLERANCE));
                 
-                if (isMainBarColor || isUnderscoreLineColor || isHPUnderscoreGradient) {
-                    currentX = x;
-                    consecutiveNonBarPixels = 0;
+                if (isMainBarColor || isHPUnderscoreGradient) {
+                    currentX = x; // バーの色が続いている間は currentX を更新
+                    consecutiveNonBarPixels = 0; // 非バーピクセルカウントをリセット
                 } 
                 else if (isColorClose(pixel, targetBackgroundColor, BACKGROUND_TRANSITION_TOLERANCE) || 
                          isColorClose(pixel, GENERAL_BACKGROUND_COLOR, BACKGROUND_TRANSITION_TOLERANCE)) {
                     // バーの背景色、または全体の背景色に当たったらカウント
                     consecutiveNonBarPixels++;
                     if (consecutiveNonBarPixels >= CONSECUTIVE_NON_BAR_PIXELS_THRESHOLD) {
-                        currentX = x - CONSECUTIVE_NON_BAR_PIXELS_THRESHOLD; // 遡る
+                        currentX = x - CONSECUTIVE_NON_BAR_PIXELS_THRESHOLD; // 遡って終了
                         break; 
                     }
                 } 
-                else {
-                    // その他の色が続いたらカウント
+                else { // その他の不明な色（ノイズなど）
                     consecutiveNonBarPixels++;
                     if (consecutiveNonBarPixels >= CONSECUTIVE_NON_BAR_PIXELS_THRESHOLD) {
                         currentX = x - CONSECUTIVE_NON_BAR_PIXELS_THRESHOLD;
