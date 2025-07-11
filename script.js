@@ -314,8 +314,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             let currentX = startX; 
-            let foundBarStart = false; // バー本体の色が見つかったかどうかのフラグ
-            let consecutiveNonTargetPixels = 0; // バー本体でも縁でもないピクセルの連続カウント
+            let foundBarMainColor = false; // バー本体の主要な色が見つかったかどうかのフラグ
+            let consecutiveNonTargetPixels = 0; 
+
+            // ★★★ targetBackgroundColor をループ内で定義する ★★★
+            let targetBackgroundColor = GENERAL_BACKGROUND_COLOR; 
+            if (barInfo.name === '攻撃' || barInfo.name === '防御' || barInfo.name === '敏捷') {
+                targetBackgroundColor = BAR_BACKGROUND_TYPE1;
+            } else if (barInfo.name === 'HP' || barInfo.name === '魔攻' || barInfo.name === '魔防') {
+                targetBackgroundColor = BAR_BACKGROUND_TYPE2;
+            }
 
             for (let x = SCAN_BAR_COLOR_X_START; x <= SCAN_BAR_COLOR_X_END_FOR_PERCENTAGE; x++) { 
                 const pixel = getPixelColor(imageData, x, barY);
@@ -326,14 +334,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (isMainBarColor || isHPUnderscoreGradient) { // バー本体の色が見つかった
                     currentX = x; 
-                    foundBarStart = true;
+                    foundBarMainColor = true; // バーの主要な色が見つかったことを記録
                     consecutiveNonTargetPixels = 0; 
                 } 
                 else if (isFrameLineColor) { // バー本体ではないが縁の色が見つかった
-                    // バー本体が見つかっていれば、縁もバーの一部とみなして長さを更新
-                    // バー本体がまだ見つかっていない場合（バーの左端の縁）は、
-                    // バーの長さを更新せず、あくまで通過点として扱う
-                    if (foundBarStart) { 
+                    // バーの主要な色が見つかった後であれば、縁もバーの一部とみなして長さを更新
+                    // まだ主要な色が見つかっていない場合（バーの左端の縁）は、長さを更新しない
+                    if (foundBarMainColor) { 
                         currentX = x;
                     }
                     consecutiveNonTargetPixels = 0; 
