@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const PIXEL_THRESHOLD_FOR_FRAME_LINE = FRAME_SCAN_X_HALF_WIDTH * 2 * 0.5; // スキャン範囲の50%以上がフレーム色ならOK
 
         // Y_top_frame の検出 (上から下へ)
-        let foundBackgroundEnd = false; // 背景が終わったことを示すフラグ
+        let foundBackgroundEnd = false; 
         for (let y = 0; y < height; y++) {
             let currentLineFramePixels = 0;
             let currentLineBgPixels = 0;
@@ -153,12 +153,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // 画像の端からスキャンして、一般的な背景色ではないピクセルが一定割合現れたら、そこが背景の終わり
             if (!foundBackgroundEnd && currentLineBgPixels < (FRAME_SCAN_X_HALF_WIDTH * 2 * 0.9)) { 
                 foundBackgroundEnd = true;
             }
 
-            // 背景の終わりが見つかり、かつフレーム色のピクセルが一定数あれば、そこがY_top_frame
             if (foundBackgroundEnd && currentLineFramePixels > PIXEL_THRESHOLD_FOR_FRAME_LINE) {
                 Y_top_frame = y;
                 break;
@@ -299,11 +297,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- 5. 各ステータスバーの右端 (`currentX`) の検出とパーセンテージ計算 ---
         const finalResults = [];
         const BACKGROUND_TRANSITION_TOLERANCE = COLOR_TOLERANCE * 1.5; 
-        const BAR_COLOR_DETECTION_TOLERANCE = COLOR_TOLERANCE * 1.3; // バー本体の色検出の許容誤差を再調整 (39)
+        const BAR_COLOR_DETECTION_TOLERANCE = COLOR_TOLERANCE * 1.3; // バー本体の色検出の許容誤差 (39)
         
-        const CONSECUTIVE_NON_BAR_PIXELS_THRESHOLD = 5; 
+        const CONSECUTIVE_NON_TARGET_PIXELS_THRESHOLD = 5; // バー本体色でも縁色でもないピクセルが連続するしきい値
 
-        const SCAN_BAR_COLOR_X_START = startX + 2; 
+        // スキャン範囲をstartXの少し左からに調整し、バーの開始点の縁も考慮できるようにする
+        const SCAN_BAR_COLOR_X_START = Math.max(0, startX - 5); 
         const SCAN_BAR_COLOR_X_END_FOR_PERCENTAGE = maxX + 20; 
 
         for (let i = 0; i < STATUS_BARS.length; i++) {
@@ -315,38 +314,42 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             let currentX = startX; 
-            
-            let targetBackgroundColor = GENERAL_BACKGROUND_COLOR; 
-            if (barInfo.name === '攻撃' || barInfo.name === '防御' || barInfo.name === '敏捷') {
-                targetBackgroundColor = BAR_BACKGROUND_TYPE1;
-            } else if (barInfo.name === 'HP' || barInfo.name === '魔攻' || barInfo.name === '魔防') {
-                targetBackgroundColor = BAR_BACKGROUND_TYPE2;
-            }
-
-            let consecutiveNonBarPixels = 0; 
+            let foundBarStart = false; // バー本体の色が見つかったかどうかのフラグ
+            let consecutiveNonTargetPixels = 0; // バー本体でも縁でもないピクセルの連続カウント
 
             for (let x = SCAN_BAR_COLOR_X_START; x <= SCAN_BAR_COLOR_X_END_FOR_PERCENTAGE; x++) { 
                 const pixel = getPixelColor(imageData, x, barY);
                 
                 const isMainBarColor = isColorClose(pixel, barInfo.color, BAR_COLOR_DETECTION_TOLERANCE);
                 const isHPUnderscoreGradient = (barInfo.name === 'HP' && isColorClose(pixel, HP_UNDERSCORE_GRADIENT_START_COLOR, BAR_COLOR_DETECTION_TOLERANCE));
-                
-                if (isMainBarColor || isHPUnderscoreGradient) {
+                const isFrameLineColor = isColorClose(pixel, FRAME_LINE_COLOR, BAR_COLOR_DETECTION_TOLERANCE); // 縁の色もバーの一部とみなす
+
+                if (isMainBarColor || isHPUnderscoreGradient) { // バー本体の色が見つかった
                     currentX = x; 
-                    consecutiveNonBarPixels = 0; 
+                    foundBarStart = true;
+                    consecutiveNonTargetPixels = 0; 
                 } 
+                else if (isFrameLineColor) { // バー本体ではないが縁の色が見つかった
+                    // バー本体が見つかっていれば、縁もバーの一部とみなして長さを更新
+                    // バー本体がまだ見つかっていない場合（バーの左端の縁）は、
+                    // バーの長さを更新せず、あくまで通過点として扱う
+                    if (foundBarStart) { 
+                        currentX = x;
+                    }
+                    consecutiveNonTargetPixels = 0; 
+                }
                 else if (isColorClose(pixel, targetBackgroundColor, BACKGROUND_TRANSITION_TOLERANCE) || 
                          isColorClose(pixel, GENERAL_BACKGROUND_COLOR, BACKGROUND_TRANSITION_TOLERANCE)) {
-                    consecutiveNonBarPixels++;
-                    if (consecutiveNonBarPixels >= CONSECUTIVE_NON_BAR_PIXELS_THRESHOLD) {
-                        currentX = x - CONSECUTIVE_NON_BAR_PIXELS_THRESHOLD; 
+                    consecutiveNonTargetPixels++;
+                    if (consecutiveNonTargetPixels >= CONSECUTIVE_NON_TARGET_PIXELS_THRESHOLD) {
+                        currentX = x - CONSECUTIVE_NON_TARGET_PIXELS_THRESHOLD; 
                         break; 
                     }
                 } 
-                else { 
-                    consecutiveNonBarPixels++;
-                    if (consecutiveNonBarPixels >= CONSECUTIVE_NON_BAR_PIXELS_THRESHOLD) {
-                        currentX = x - CONSECUTIVE_NON_BAR_PIXELS_THRESHOLD;
+                else { // 上記のどれでもない、ノイズまたは想定外の色
+                    consecutiveNonTargetPixels++;
+                    if (consecutiveNonTargetPixels >= CONSECUTIVE_NON_TARGET_PIXELS_THRESHOLD) {
+                        currentX = x - CONSECUTIVE_NON_TARGET_PIXELS_THRESHOLD;
                         break; 
                     }
                 }
