@@ -164,14 +164,19 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // 2. 各ステータスバーのY座標の特定
+// 2. 各ステータスバーのY座標の特定
         const detectedBarYColors = []; 
 
         // バーの内部をサンプリングするX座標
-        // HPバーの検出精度を上げるため、サンプリング位置を調整
-        // startX + 70 を試す（画像によって調整が必要）
-        const sampleXForBarY = startX + 70; 
-        // あるいは、startXとmaxXの中間点に近づけるように
+        // グラデーションが始まる前の、色が安定している部分を狙うため、startXから少し右にずらす
+        // ここを調整します！ 以前の +50 からさらに右へ。
+        // 例1: startX + 100 を試す
+        const sampleXForBarY = startX + 100; 
+
+        // 例2: もしこれでうまくいかない場合、もう少し右を試す
+        // const sampleXForBarY = startX + 120; 
+
+        // あるいは、StartXとMaxXの中間点に近いが、少し左寄りの位置を試すこともできます。
         // const sampleXForBarY = Math.floor(startX + (maxX - startX) * 0.2); // 例えば20%の位置
 
         if (sampleXForBarY < 0 || sampleXForBarY >= width) {
@@ -230,9 +235,8 @@ document.addEventListener('DOMContentLoaded', () => {
         for (const barInfo of STATUS_BARS) {
             let assignedY = null;
             let bestMatchIndex = -1;
-            let minColorDiffForAssign = Infinity; // 色の差で最適なYを見つける
+            let minColorDiffForAssign = Infinity;
 
-            // 未使用の検出済みY座標の中で、現在のバーの色に最も近いものを探す
             for (let j = 0; j < detectedBarYColors.length; j++) {
                 if (usedYIndices.has(j)) continue;
 
@@ -250,9 +254,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // 色の差が許容範囲内で、Y座標が見つかった場合のみ採用
-            // ここで COLOR_TOLERANCE ではなく、少し広めの許容値を使うことも検討
-            if (assignedY !== null && minColorDiffForAssign < (COLOR_TOLERANCE * 1.5)) { // 1.5倍の許容値で試す
+            // ここは前回のCOLOR_TOLERANCE * 1.75 で据え置きます。
+            // Y座標の検出が安定すれば、この許容値で問題ないはずです。
+            if (assignedY !== null && minColorDiffForAssign < (COLOR_TOLERANCE * 1.75)) { 
                 finalBarYsMap.set(barInfo.name, assignedY);
                 usedYIndices.add(bestMatchIndex);
             } else {
