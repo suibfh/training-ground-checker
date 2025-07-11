@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const STATUS_BARS = [
         { name: 'HP', color: { r: 252, g: 227, b: 125 } },    // #FCE37D (HPバー本体色)
         { name: '攻撃', color: { r: 214, g: 107, b: 135 } },   // #D66B87
-        { name: '魔攻', color: { r: 85, g: 134, b: 200 } },    // #5586C8  <-- この行を修正
+        { name: '魔攻', color: { r: 85, g: 134, b: 200 } },    // #5586C8
         { name: '防御', color: { r: 237, g: 170, b: 118 } },   // #EDAA76
         { name: '魔防', color: { r: 140, g: 210, b: 236 } },   // #8CD2EC
         { name: '敏捷', color: { r: 115, g: 251, b: 211 } }    // #73FBD3
@@ -112,7 +112,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- 1. HPバーのY座標を特定 ---
         // 画像の左から25%程度のX座標でHPバー本体色を探す
-        // バーの左端の「｜」が15%位置にあるため、その右で本体色を検出する
         const SCAN_X_FOR_HP_BAR_Y = Math.floor(width * 0.25); 
 
         for (let y = 0; y < height; y++) {
@@ -158,7 +157,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- 4. 各ステータスバーのY座標の特定 ---
         const detectedBarYColors = []; 
-        const sampleXForBarY = startX + 10; // 「｜」線のすぐ右側が最も安全
+
+        // sampleXForBarY を startX からもう少し離れた、中央寄りの位置に調整
+        // 例: startX と maxX の中間点、または startX から全長の1/3程度
+        const sampleXForBarY = startX + Math.floor((maxX - startX) * 0.33); // 全長の約1/3の位置
 
         if (sampleXForBarY < 0 || sampleXForBarY >= width) {
              console.error("sampleXForBarY が画像範囲外です:", sampleXForBarY, "width:", width);
