@@ -158,13 +158,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- 4. 各ステータスバーのY座標の特定 ---
         const detectedBarYColors = []; 
 
-        // sampleXForBarY を startX からもう少し離れた、中央寄りの位置に調整
-        // 例: startX と maxX の中間点、または startX から全長の1/3程度
-        const sampleXForBarY = startX + Math.floor((maxX - startX) * 0.33); // 全長の約1/3の位置
+        // sampleXForBarY を startX からの固定オフセット (バーの左端に近いため、短いバーでも色を拾いやすい)
+        const sampleXForBarY = startX + 10; 
+        
+        // 平均色をサンプリングする範囲 (sampleXForBarY を中心に左右2ピクセル、合計5ピクセル)
+        const SAMPLE_RANGE_HALF = 2; // sampleXForBarY から左右に何ピクセル範囲を見るか
 
-        if (sampleXForBarY < 0 || sampleXForBarY >= width) {
-             console.error("sampleXForBarY が画像範囲外です:", sampleXForBarY, "width:", width);
-             resultsDiv.innerHTML = '<p style="color: red;">内部エラー: バーのY座標検出位置が範囲外です。sampleXForBarYの値を調整してください。</p>';
+        if (sampleXForBarY - SAMPLE_RANGE_HALF < 0 || sampleXForBarY + SAMPLE_RANGE_HALF >= width) {
+             console.error("sampleXForBarY のサンプリング範囲が画像範囲外です。sampleXForBarY および SAMPLE_RANGE_HALF の値を調整してください。");
+             resultsDiv.innerHTML = '<p style="color: red;">内部エラー: バーのY座標検出位置が範囲外です。</p>';
              return;
         }
 
@@ -183,15 +185,38 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (isTooCloseToDetected) continue;
 
-            const pixel = getPixelColor(imageData, sampleXForBarY, y);
+            // 複数ピクセルの平均色を計算
+            let avgR = 0, avgG = 0, avgB = 0;
+            let pixelCount = 0;
+            for (let xOffset = -SAMPLE_RANGE_HALF; xOffset <= SAMPLE_RANGE_HALF; xOffset++) {
+                const pixel = getPixelColor(imageData, sampleXForBarY + xOffset, y);
+                // 有効なピクセルのみを平均に含める（-1,-1,-1は範囲外の意味）
+                if (pixel.r !== -1) { 
+                    avgR += pixel.r;
+                    avgG += pixel.g;
+                    avgB += pixel.b;
+                    pixelCount++;
+                }
+            }
+
+            let sampledAvgColor = null;
+            if (pixelCount > 0) {
+                sampledAvgColor = {
+                    r: Math.round(avgR / pixelCount),
+                    g: Math.round(avgG / pixelCount),
+                    b: Math.round(avgB / pixelCount)
+                };
+            } else {
+                continue; // 有効なピクセルがなければスキップ
+            }
 
             let closestBarInfo = null;
             let minColorDiff = Infinity;
 
             for (const barInfo of STATUS_BARS) {
-                const dr = pixel.r - barInfo.color.r;
-                const dg = pixel.g - barInfo.color.g;
-                const db = pixel.b - barInfo.color.b; 
+                const dr = sampledAvgColor.r - barInfo.color.r;
+                const dg = sampledAvgColor.g - barInfo.color.g;
+                const db = sampledAvgColor.b - barInfo.color.b; 
                 const currentDiff = (dr * dr + dg * dg + db * db);
 
                 if (currentDiff < minColorDiff && currentDiff < (COLOR_TOLERANCE * COLOR_TOLERANCE)) {
@@ -236,7 +261,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            if (assignedY !== null && minColorDiffForAssign < (COLOR_TOLERANCE * 2.0)) { 
+            // Y座標の割り当ての許容誤差を少し広げる
+            if (assignedY !== null && minColorDiffForAssign < (COLOR_TOLERANCE * 3.0)) { 
                 finalBarYsMap.set(barInfo.name, assignedY);
                 usedYIndices.add(bestMatchIndex);
             } else {
