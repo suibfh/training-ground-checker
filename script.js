@@ -9,7 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let uploadedImage = null;
 
     const STATUS_BARS = [
-        { name: 'HP', color: { r: 252, g: 227, b: 126 } },    // #FCE37E
+        // ***** HPバー本体のカラーコードを更新 *****
+        { name: 'HP', color: { r: 252, g: 227, b: 125 } },    // #FCE37D
         { name: '攻撃', color: { r: 214, g: 107, b: 135 } },   // #D66B87
         { name: '魔攻', color: { r: 85, g: 134, b: 200 } },    // #5586C8
         { name: '防御', color: { r: 237, g: 170, b: 118 } },   // #EDAA76
@@ -17,10 +18,10 @@ document.addEventListener('DOMContentLoaded', () => {
         { name: '敏捷', color: { r: 115, g: 251, b: 211 } }    // #73FBD3
     ];
 
-    // ***** ここを 30 に変更しました *****
     const COLOR_TOLERANCE = 30; // RGB値の二乗誤差のしきい値
 
-    const WHITE_COLOR = { r: 234, g: 253, b: 255 }; // #EAFDFF (補助線)
+    // ***** バーの枠線カラーコードを更新 *****
+    const WHITE_COLOR = { r: 255, g: 253, b: 254 }; // #FFFDFE (補助線)
 
     const BACKGROUND_COLOR_TYPE1 = { r: 70, g: 51, b: 25 }; // #463319 (攻撃、防御、敏捷の背景)
     const BACKGROUND_COLOR_TYPE2 = { r: 88, g: 69, b: 36 }; // #584524 (HP、魔攻、魔防の背景)
@@ -168,9 +169,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // 2. 各ステータスバーのY座標の特定
         const detectedBarYColors = []; 
 
-        // バーの内部をサンプリングするX座標
-        // グラデーションが始まる前の、色が安定している部分を狙うため、startXから少し右にずらす
-        const sampleXForBarY = startX + 150; 
+        // ***** sampleXForBarY をさらに右に移動 (例: startX + 200) *****
+        // バーの長さが80%あるのであれば、グラデーション部分を確実に避けて、
+        // バー本体の色が安定して現れる位置を狙う
+        const sampleXForBarY = startX + 200; 
 
         if (sampleXForBarY < 0 || sampleXForBarY >= width) {
              console.error("sampleXForBarY が画像範囲外です:", sampleXForBarY, "width:", width);
@@ -205,7 +207,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const db = pixel.b - barInfo.b;
                 const currentDiff = (dr * dr + dg * dg + db * db);
 
-                // COLOR_TOLERANCE が 30 になったため、ここもより寛容になります
                 if (currentDiff < minColorDiff && currentDiff < (COLOR_TOLERANCE * COLOR_TOLERANCE)) {
                     minColorDiff = currentDiff;
                     closestBarInfo = barInfo;
@@ -248,7 +249,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // COLOR_TOLERANCE が 30 になったため、ここもより寛容になります (30 * 2.0 = 60)
             if (assignedY !== null && minColorDiffForAssign < (COLOR_TOLERANCE * 2.0)) { 
                 finalBarYsMap.set(barInfo.name, assignedY);
                 usedYIndices.add(bestMatchIndex);
@@ -272,7 +272,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 3. 各ステータスバーの右端 (`currentX`) の検出とパーセンテージ計算
         const finalResults = [];
-        // COLOR_TOLERANCE が 30 になったため、ここもより寛容になります (30 * 1.5 = 45)
         const BACKGROUND_TRANSITION_TOLERANCE = COLOR_TOLERANCE * 1.5; 
 
         for (let i = 0; i < STATUS_BARS.length; i++) {
@@ -332,7 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
         navigator.clipboard.writeText(textToCopy.trim()).then(() => {
             alert('結果をコピーしました！');
         }).catch(err => {
-            console.error('コピーに失敗しました:', err);
+                console.error('コピーに失敗しました:', err);
             alert('コピーに失敗しました。手動でコピーしてください。');
         });
     });
