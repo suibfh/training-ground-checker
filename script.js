@@ -17,7 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
         { name: '敏捷', color: { r: 115, g: 251, b: 211 } }    // #73FBD3
     ];
 
-    const COLOR_TOLERANCE = 20; // RGB値の二乗誤差のしきい値
+    // ***** ここを 30 に変更しました *****
+    const COLOR_TOLERANCE = 30; // RGB値の二乗誤差のしきい値
 
     const WHITE_COLOR = { r: 234, g: 253, b: 255 }; // #EAFDFF (補助線)
 
@@ -169,7 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // バーの内部をサンプリングするX座標
         // グラデーションが始まる前の、色が安定している部分を狙うため、startXから少し右にずらす
-        // ***** ここを startX + 150 に変更しました *****
         const sampleXForBarY = startX + 150; 
 
         if (sampleXForBarY < 0 || sampleXForBarY >= width) {
@@ -178,7 +178,6 @@ document.addEventListener('DOMContentLoaded', () => {
              return;
         }
 
-        // ***** barDetectStepY を 1 に変更します。これでY座標のスキャンがより細かくなります *****
         const barDetectYStart = Math.floor(height * 0.2);
         const barDetectYEnd = Math.floor(height * 0.9);
         const barDetectStepY = 1; 
@@ -203,9 +202,10 @@ document.addEventListener('DOMContentLoaded', () => {
             for (const barInfo of STATUS_BARS) {
                 const dr = pixel.r - barInfo.color.r;
                 const dg = pixel.g - barInfo.color.g;
-                const db = pixel.b - barInfo.color.b;
+                const db = pixel.b - barInfo.b;
                 const currentDiff = (dr * dr + dg * dg + db * db);
 
+                // COLOR_TOLERANCE が 30 になったため、ここもより寛容になります
                 if (currentDiff < minColorDiff && currentDiff < (COLOR_TOLERANCE * COLOR_TOLERANCE)) {
                     minColorDiff = currentDiff;
                     closestBarInfo = barInfo;
@@ -248,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // ***** ここを COLOR_TOLERANCE * 2.0 に変更しました *****
+            // COLOR_TOLERANCE が 30 になったため、ここもより寛容になります (30 * 2.0 = 60)
             if (assignedY !== null && minColorDiffForAssign < (COLOR_TOLERANCE * 2.0)) { 
                 finalBarYsMap.set(barInfo.name, assignedY);
                 usedYIndices.add(bestMatchIndex);
@@ -272,6 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 3. 各ステータスバーの右端 (`currentX`) の検出とパーセンテージ計算
         const finalResults = [];
+        // COLOR_TOLERANCE が 30 になったため、ここもより寛容になります (30 * 1.5 = 45)
         const BACKGROUND_TRANSITION_TOLERANCE = COLOR_TOLERANCE * 1.5; 
 
         for (let i = 0; i < STATUS_BARS.length; i++) {
