@@ -8,25 +8,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let uploadedImage = null; // 読み込まれた画像オブジェクトを保持
 
-    // ステータスバーの定義と正確な色（RGB）に更新
+    // ステータスバーの定義と正確な色（RGB）
     const STATUS_BARS = [
-        { name: 'HP', color: { r: 252, g: 227, b: 126 } },    // 淡い黄色 #FCE37E
-        { name: '攻撃', color: { r: 214, g: 107, b: 135 } },   // 淡い赤 #D66B87
-        { name: '魔攻', color: { r: 85, g: 134, b: 200 } },    // 淡い青 #5586C8
-        { name: '防御', color: { r: 237, g: 170, b: 118 } },   // 淡い茶色 #EDAA76
-        { name: '魔防', color: { r: 140, g: 210, b: 236 } },   // 淡い水色 #8CD2EC
-        { name: '敏捷', color: { r: 115, g: 251, b: 211 } }    // 淡い青緑 #73FBD3
+        { name: 'HP', color: { r: 252, g: 227, b: 126 } },    // #FCE37E
+        { name: '攻撃', color: { r: 214, g: 107, b: 135 } },   // #D66B87
+        { name: '魔攻', color: { r: 85, g: 134, b: 200 } },    // #5586C8
+        { name: '防御', color: { r: 237, g: 170, b: 118 } },   // #EDAA76
+        { name: '魔防', color: { r: 140, g: 210, b: 236 } },   // #8CD2EC
+        { name: '敏捷', color: { r: 115, g: 251, b: 211 } }    // #73FBD3
     ];
 
     // 色の許容範囲 (小さいほど厳密、大きいほど寛容)
-    // 正確なRGB値が分かったため、COLOR_TOLERANCEを小さくして精度を上げます。
-    // まずは20で試して、必要に応じて調整してください。
     const COLOR_TOLERANCE = 20; // RGB値の二乗誤差のしきい値
 
-    // 白い線の色 (補助線のカラーコードに更新)
-    const WHITE_COLOR = { r: 234, g: 253, b: 255 }; // #EAFDFF (ほぼ白に近い青)
-
-    // ... （以降のコードは変更なし） ...
+    // 補助線の色 (白に近い青)
+    const WHITE_COLOR = { r: 234, g: 253, b: 255 }; // #EAFDFF
 
     // --- ヘルパー関数 ---
 
@@ -39,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function getPixelColor(imageData, x, y) {
         if (x < 0 || x >= imageData.width || y < 0 || y >= imageData.height) {
-            return { r: -1, g: -1, b: -1 }; // 範囲外
+            return { r: -1, g: -1, b: -1 }; // 範囲外の場合は無効な値を返す
         }
         const index = (y * imageData.width + x) * 4;
         return {
@@ -53,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * 2つの色が許容範囲内にあるか判定
      * @param {{r: number, g: number, b: number}} color1
      * @param {{r: number, g: number, b: number}} color2
-     * @param {number} tolerance - 許容するRGB値の差の二乗
+     * @param {number} tolerance - 許容するRGB値の差
      * @returns {boolean}
      */
     function isColorClose(color1, color2, tolerance) {
@@ -91,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 if (consecutivePixels >= minWidth) {
                     // 線の検出が完了
-                    return direction === 'leftToRight' ? lineStart : x + step; // 右から左の場合、開始点は1つ戻る
+                    return direction === 'leftToRight' ? lineStart : x + step;
                 }
                 consecutivePixels = 0;
                 lineStart = null;
@@ -103,7 +99,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return null;
     }
-
 
     // --- イベントリスナー ---
 
@@ -117,20 +112,17 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onload = (e) => {
             uploadedImage = new Image();
             uploadedImage.onload = () => {
-                // Canvasのサイズを画像に合わせて調整
                 statusCanvas.width = uploadedImage.width;
                 statusCanvas.height = uploadedImage.height;
 
-                // Canvasに画像を描画
                 ctx.clearRect(0, 0, statusCanvas.width, statusCanvas.height);
                 ctx.drawImage(uploadedImage, 0, 0, uploadedImage.width, uploadedImage.height);
 
-                overlayMessage.style.display = 'none'; // メッセージを非表示に
+                overlayMessage.style.display = 'none';
 
-                // 解析処理の実行
                 analyzeImage();
 
-                copyResultsBtn.classList.remove('hidden'); // コピーボタンを表示
+                copyResultsBtn.classList.remove('hidden');
             };
             uploadedImage.src = e.target.result;
         };
@@ -138,8 +130,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- メインの画像解析ロジック ---
-
-// script.js の analyzeImage 関数内を以下のように修正・置き換え
 
     function analyzeImage() {
         if (!uploadedImage) {
@@ -156,29 +146,21 @@ document.addEventListener('DOMContentLoaded', () => {
         let maxX = null;   // バーの最大長終点 (100%の基準線)
         
         // 1. 基準線 (startX, maxX) の検出
-        // 画像のY座標をサンプリングして、バーが存在しそうな行を探し、基準線を検出
-        // 例えば、画像の高さの20%から80%の範囲で、10ピクセルごとにサンプリング
         const sampleYRangeStart = Math.floor(height * 0.2);
         const sampleYRangeEnd = Math.floor(height * 0.8);
-        const sampleStepYForLines = 10; // 基準線検出のためのY軸サンプリング間隔
+        const sampleStepYForLines = 10;
 
-        let startXCandidates = {}; // startXの候補とその出現回数
-        let maxXCandidates = {};   // maxXの候補とその出現回数
+        let startXCandidates = {};
+        let maxXCandidates = {};
 
         for (let y = sampleYRangeStart; y < sampleYRangeEnd; y += sampleStepYForLines) {
-            // 細い白い垂直線 (0の基準線) を左から右へ検出
-            // 線の太さは1ピクセルと仮定
             const foundStartX = findVerticalLine(imageData, y, WHITE_COLOR, 1, 'leftToRight');
             if (foundStartX !== null) {
                 startXCandidates[foundStartX] = (startXCandidates[foundStartX] || 0) + 1;
             }
 
-            // 太い白い垂直線 (100%の基準線) を右から左へ検出
-            // 線の太さは3ピクセル以上と仮定
             const foundMaxX = findVerticalLine(imageData, y, WHITE_COLOR, 3, 'rightToLeft');
             if (foundMaxX !== null) {
-                // 右から左に走査しているので、検出されたXは線の左端。
-                // 100%基準線は「外枠の右側」なので、検出されたXがそのままmaxXとなる。
                 maxXCandidates[foundMaxX] = (maxXCandidates[foundMaxX] || 0) + 1;
             }
         }
@@ -200,126 +182,102 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 2. 各ステータスバーのY座標の特定
         const definiteBarYs = [];
-        const checkedYs = new Set(); // 重複チェック用
-
-        // startXとmaxXの間のX座標で、各バーの色を縦方向に探す
-        // バーが始まる可能性のあるY座標の範囲
-        const barDetectYStart = Math.floor(height * 0.2); // 画像上部からの割合で調整
-        const barDetectYEnd = Math.floor(height * 0.9);   // 画像下部からの割合で調整
-        const barDetectStepY = 5; // Y軸方向の走査間隔 (細かく)
 
         // バーの内部をサンプリングするX座標 (startXとmaxXの間の中央付近)
+        // もしバーが短い場合や、画像解像度が低い場合は、この位置を調整する必要があるかもしれません。
+        // 例えば、startXからバーの幅の20%くらいの場所: Math.floor(startX + (maxX - startX) * 0.2)
         const sampleXForBarY = Math.floor(startX + (maxX - startX) / 2);
         
-        // デバッグ用: 走査X座標が有効範囲内か確認
         if (sampleXForBarY < 0 || sampleXForBarY >= width) {
-             console.error("sampleXForBarY が画像範囲外です:", sampleXForBarY);
-             resultsDiv.innerHTML = '<p style="color: red;">内部エラー: バーの中心を特定できません。</p>';
+             console.error("sampleXForBarY が画像範囲外です:", sampleXForBarY, "width:", width);
+             resultsDiv.innerHTML = '<p style="color: red;">内部エラー: バーのY座標検出位置が範囲外です。sampleXForBarYの値を調整してください。</p>';
              return;
         }
 
+        // バーが存在する可能性のあるY座標の範囲と走査間隔
+        const barDetectYStart = Math.floor(height * 0.2);
+        const barDetectYEnd = Math.floor(height * 0.9);
+        const barDetectStepY = 3; // Y軸方向の走査間隔 (細かく)
+
+        // バー検出時のY座標の近接判定閾値 (これより近いY座標は同じバーの一部と見なす)
+        // スクリーンショットでバー間のピクセル間隔を測って正確な値に調整してください
+        const BAR_VERTICAL_SEPARATION_THRESHOLD = 30; // 例: 30ピクセル。実測値に合わせて調整！
+
         for (let y = barDetectYStart; y < barDetectYEnd; y += barDetectStepY) {
-            // すでに検出済みのY座標に近い場合はスキップ
             let isTooCloseToDetected = false;
             for (const existingY of definiteBarYs) {
-                if (Math.abs(y - existingY) < 20) { // バー間の最小間隔を20ピクセルと仮定（調整必要）
+                if (Math.abs(y - existingY) < BAR_VERTICAL_SEPARATION_THRESHOLD) {
                     isTooCloseToDetected = true;
                     break;
                 }
             }
             if (isTooCloseToDetected) continue;
 
-            // バーの中央付近のX座標で、各バーの色を探す
             const pixel = getPixelColor(imageData, sampleXForBarY, y);
 
             for (const barInfo of STATUS_BARS) {
                 if (isColorClose(pixel, barInfo.color, COLOR_TOLERANCE)) {
-                    // バーの色が見つかったら、そのY座標を確定Y座標として追加
                     definiteBarYs.push(y);
                     break; // このY座標でバーが見つかったら次のY座標へ
                 }
             }
 
-            // 必要な数のバーが見つかったらループを終了
             if (definiteBarYs.length >= STATUS_BARS.length) {
                 break;
             }
         }
         
-        // 検出されたY座標をソート（念のため）
         definiteBarYs.sort((a, b) => a - b);
 
         console.log("Detected Bar Ys:", definiteBarYs);
 
         if (definiteBarYs.length < STATUS_BARS.length) {
-            resultsDiv.innerHTML = '<p style="color: red;">ステータスバーのY座標の特定に失敗しました。すべてのバーが見つからないか、バー間の間隔が広すぎる可能性があります。</p>';
+            resultsDiv.innerHTML = `<p style="color: red;">ステータスバーのY座標の特定に失敗しました。すべてのバーが見つからないか、バー間の間隔が広すぎる可能性があります。</p><p style="color: red;">現在の検出数: ${definiteBarYs.length}/${STATUS_BARS.length}</p>`;
             return;
         }
         // 見つかったバーのY座標が多い場合は、上からSTATUS_BARS.length個だけ採用
         definiteBarYs.splice(STATUS_BARS.length);
 
 
-// 3. 各ステータスバーの右端 (`currentX`) の検出とパーセンテージ計算
+        // 3. 各ステータスバーの右端 (`currentX`) の検出とパーセンテージ計算
         const finalResults = [];
         for (let i = 0; i < STATUS_BARS.length; i++) {
             const barInfo = STATUS_BARS[i];
             const barY = definiteBarYs[i]; 
-            let currentX = startX; // 初期値はバーの開始点
+            let currentX = startX; // currentXをstartXで初期化 (0%の位置)
+            let lastColoredPixelX = startX; // 最後にバーの色が検出されたX座標
 
-            // バーの色と背景色、白い枠線を区別するためのロジックを強化
-            // バーのピクセルを検出したら、その直後が白い枠線かどうかを確認する
-            let lastBarColorX = startX; // 最後にバーの色が検出されたX座標
-
+            // startXからmaxXまでを走査し、バーの色が検出される最後のピクセルを探す
             for (let x = startX; x <= maxX; x++) {
                 const pixel = getPixelColor(imageData, x, barY);
-                // 次のピクセルも見て、白い枠線との境界を探る
-                const nextPixel = getPixelColor(imageData, x + 1, barY); // 1ピクセル右のピクセル
-
+                
+                // 現在のピクセルがバーの色に近い場合
                 if (isColorClose(pixel, barInfo.color, COLOR_TOLERANCE)) {
-                    lastBarColorX = x; // バーの色が見つかったら、X座標を更新
+                    lastColoredPixelX = x; // 最後に色が見つかったX座標を更新
                 } 
-                
-                // バーの色が検出された、かつ、その次のピクセルが白い枠線に近い場合、ここをバーの終点とみなす
-                // または、現在のピクセルがバーの色で、次のピクセルがバーの色ではないが白い枠に近い場合も考慮
-                // 今回はシンプルに、バーの色が途切れた直後が白なら、その直前が終点というロジックで試します
-                if (isColorClose(pixel, barInfo.color, COLOR_TOLERANCE) && 
-                    isColorClose(nextPixel, WHITE_COLOR, COLOR_TOLERANCE)) {
-                    // バーの色があり、その右隣が白い線なら、ここがバーの右端
-                    currentX = x;
-                    break; // これでバーの右端が見つかったと判断
-                }
-                
-                // もしバーの色が途切れて、かつ白い線でもない場合（背景色など）は、
-                // 最後のバーの色だったX座標が終点になる
-                // これは上記ifでbreakしなかった場合のフォールバック
-                if (!isColorClose(pixel, barInfo.color, COLOR_TOLERANCE) && x > startX) {
-                    currentX = lastBarColorX; // 最後にバーの色だったX座標を採用
-                    break;
-                }
             }
 
-            // もしループがmaxXまで到達してもバーの色が途切れなかった場合（バーが100%の場合など）
-            // currentXはmaxXになるべきだが、ループの性質上lastBarColorXが更新されていない可能性がある
-            if (currentX === startX && lastBarColorX > startX) {
-                // ループ中にバーの色が一度も検出されなかった場合（0%の場合）
-                // またはバーが非常に短い場合
-                // ここで改めてlastBarColorXをセットし直す
-                currentX = lastBarColorX; 
-            }
-            if (currentX === startX && lastBarColorX === startX && percentage === 0) {
-                 // 完全に0%の場合（バーの色が見つからなかった場合）はstartXのまま
-            } else if (currentX < startX) {
-                // 計算ミスなどでstartXより小さくなることを防ぐ
-                currentX = startX;
-            }
+            // ループが終了したら、lastColoredPixelXがバーの終点になる
+            // 0%の場合（バーの色が全く見つからなかった場合）は lastColoredPixelX は startX のままになる
+            currentX = lastColoredPixelX;
 
+            // currentXがmaxXを超えないように調整
+            if (currentX > maxX) {
+                currentX = maxX;
+            }
 
             // パーセンテージ計算
             const length = currentX - startX;
             const maxLength = maxX - startX;
-            let percentage = (length / maxLength) * 100;
+            let percentage = 0; // percentageをここで確実に0で初期化
 
-            // 1%単位の精度で四捨五入
+            if (maxLength > 0) { // ゼロ除算を防ぐ
+                percentage = (length / maxLength) * 100;
+            } else {
+                percentage = 0; // maxLengthが0以下の場合は0%とする
+            }
+
+            // 1%単位で四捨五入
             percentage = Math.round(percentage);
 
             finalResults.push(`<p>${barInfo.name}: ${percentage}%</p>`);
