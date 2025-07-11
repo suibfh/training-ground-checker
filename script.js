@@ -164,20 +164,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-// 2. 各ステータスバーのY座標の特定
+        // 2. 各ステータスバーのY座標の特定
         const detectedBarYColors = []; 
 
         // バーの内部をサンプリングするX座標
         // グラデーションが始まる前の、色が安定している部分を狙うため、startXから少し右にずらす
-        // ここを調整します！ 以前の +50 からさらに右へ。
-        // 例1: startX + 100 を試す
-        const sampleXForBarY = startX + 100; 
-
-        // 例2: もしこれでうまくいかない場合、もう少し右を試す
-        // const sampleXForBarY = startX + 120; 
-
-        // あるいは、StartXとMaxXの中間点に近いが、少し左寄りの位置を試すこともできます。
-        // const sampleXForBarY = Math.floor(startX + (maxX - startX) * 0.2); // 例えば20%の位置
+        // ***** ここを startX + 150 に変更しました *****
+        const sampleXForBarY = startX + 150; 
 
         if (sampleXForBarY < 0 || sampleXForBarY >= width) {
              console.error("sampleXForBarY が画像範囲外です:", sampleXForBarY, "width:", width);
@@ -185,9 +178,10 @@ document.addEventListener('DOMContentLoaded', () => {
              return;
         }
 
+        // ***** barDetectStepY を 1 に変更します。これでY座標のスキャンがより細かくなります *****
         const barDetectYStart = Math.floor(height * 0.2);
         const barDetectYEnd = Math.floor(height * 0.9);
-        const barDetectStepY = 3;
+        const barDetectStepY = 1; 
 
         const BAR_VERTICAL_SEPARATION_THRESHOLD = 30; // バー間の最小間隔
 
@@ -254,9 +248,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // ここは前回のCOLOR_TOLERANCE * 1.75 で据え置きます。
-            // Y座標の検出が安定すれば、この許容値で問題ないはずです。
-            if (assignedY !== null && minColorDiffForAssign < (COLOR_TOLERANCE * 1.75)) { 
+            // ***** ここを COLOR_TOLERANCE * 2.0 に変更しました *****
+            if (assignedY !== null && minColorDiffForAssign < (COLOR_TOLERANCE * 2.0)) { 
                 finalBarYsMap.set(barInfo.name, assignedY);
                 usedYIndices.add(bestMatchIndex);
             } else {
