@@ -9,7 +9,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let uploadedImage = null;
 
     const STATUS_BARS = [
-        // ***** HPバー本体のカラーコードを更新 *****
         { name: 'HP', color: { r: 252, g: 227, b: 125 } },    // #FCE37D
         { name: '攻撃', color: { r: 214, g: 107, b: 135 } },   // #D66B87
         { name: '魔攻', color: { r: 85, g: 134, b: 200 } },    // #5586C8
@@ -18,13 +17,16 @@ document.addEventListener('DOMContentLoaded', () => {
         { name: '敏捷', color: { r: 115, g: 251, b: 211 } }    // #73FBD3
     ];
 
-    const COLOR_TOLERANCE = 30; // RGB値の二乗誤差のしきい値
+    const COLOR_TOLERANCE = 30; // RGB値の二乗誤差のしきい値 (前回から据え置き)
 
-    // ***** バーの枠線カラーコードを更新 *****
+    // バーの枠線色はもう基準線検出には使わないが、念のため残しておく
     const WHITE_COLOR = { r: 255, g: 253, b: 254 }; // #FFFDFE (補助線)
 
     const BACKGROUND_COLOR_TYPE1 = { r: 70, g: 51, b: 25 }; // #463319 (攻撃、防御、敏捷の背景)
     const BACKGROUND_COLOR_TYPE2 = { r: 88, g: 69, b: 36 }; // #584524 (HP、魔攻、魔防の背景)
+
+    // 新たに、HPバーのグラデーション開始色を定義します
+    const HP_GRADIENT_START_COLOR = { r: 73, g: 58, b: 31 }; // #493A1F
 
     /**
      * 指定された座標のピクセルのRGB値を取得
@@ -59,38 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
                isColorClose(pixelColor, BACKGROUND_COLOR_TYPE2, tolerance);
     }
 
-    /**
-     * 指定されたY座標で垂直線を検出する汎用関数
-     */
-    function findVerticalLine(imageData, y, targetColor, minWidth, direction) {
-        const width = imageData.width;
-        let lineStart = null;
-        let consecutivePixels = 0;
-
-        const startX = direction === 'leftToRight' ? 0 : width - 1;
-        const endX = direction === 'leftToRight' ? width : -1;
-        const step = direction === 'leftToRight' ? 1 : -1;
-
-        for (let x = startX; x !== endX; x += step) {
-            const color = getPixelColor(imageData, x, y);
-            if (isColorClose(color, targetColor, COLOR_TOLERANCE)) {
-                consecutivePixels++;
-                if (lineStart === null) {
-                    lineStart = x;
-                }
-            } else {
-                if (consecutivePixels >= minWidth) {
-                    return direction === 'leftToRight' ? lineStart : x + step;
-                }
-                consecutivePixels = 0;
-                lineStart = null;
-            }
-        }
-        if (consecutivePixels >= minWidth) {
-            return direction === 'leftToRight' ? lineStart : (startX + step) - (step * consecutivePixels);
-        }
-        return null;
-    }
+    // findVerticalLine 関数はもう使わないので削除、またはコメントアウトします。
+    // function findVerticalLine(...) { ... }
 
     imageUpload.addEventListener('change', (event) => {
         const file = event.target.files[0];
@@ -133,46 +105,70 @@ document.addEventListener('DOMContentLoaded', () => {
         let startX = null;
         let maxX = null;
         
-        // 1. 基準線 (startX, maxX) の検出
-        const sampleYRangeStart = Math.floor(height * 0.2);
-        const sampleYRangeEnd = Math.floor(height * 0.8);
-        const sampleStepYForLines = 10;
+        // ***** 1. 基準線 (startX, maxX) の検出ロジックを全面的に変更 *****
+        // まず、HPバーのY座標を暫定的に特定します。
+        // HPバーのグラデーション開始色または背景色に近いピクセルを探します。
+        const HP_BAR_DETECT_Y_START = Math.floor(height * 0.1); // 画像の上部からスキャン開始
+        const HP_BAR_DETECT_Y_END = Math.floor(height * 0.3);   // HPバーがこの範囲にあると仮定
+        let tempHpBarY = null;
 
-        let startXCandidates = {};
-        let maxXCandidates = {};
+        // 画像の中央付近のX座標でHPバーのY座標を探す
+        const tempSampleX = Math.floor(width / 2); 
+        const HP_COLOR_TOLERANCE_FOR_Y_DETECT = 40; // Y座標検出は少し緩めに
 
-        for (let y = sampleYRangeStart; y < sampleYRangeEnd; y += sampleStepYForLines) {
-            const foundStartX = findVerticalLine(imageData, y, WHITE_COLOR, 1, 'leftToRight');
-            if (foundStartX !== null) {
-                startXCandidates[foundStartX] = (startXCandidates[foundStartX] || 0) + 1;
+        for (let y = HP_BAR_DETECT_Y_START; y < HP_BAR_DETECT_Y_END; y++) {
+            const pixel = getPixelColor(imageData, tempSampleX, y);
+            // HPバーのメインカラーまたはグラデーション開始色に近い色を探す
+            if (isColorClose(pixel, STATUS_BARS[0].color, HP_COLOR_TOLERANCE_FOR_Y_DETECT) ||
+                isColorClose(pixel, HP_GRADIENT_START_COLOR, HP_COLOR_TOLERANCE_FOR_Y_DETECT * 1.5)) { // グラデ開始色はさらに緩めに
+                tempHpBarY = y;
+                break;
             }
+        }
+        
+        if (tempHpBarY === null) {
+            resultsDiv.innerHTML = '<p style="color: red;">HPバーのY座標を特定できませんでした。画像を確認してください。</p>';
+            console.error("HP bar Y not found for startX/maxX detection.");
+            return;
+        }
 
-            const foundMaxX = findVerticalLine(imageData, y, WHITE_COLOR, 3, 'rightToLeft');
-            if (foundMaxX !== null) {
-                maxXCandidates[foundMaxX] = (maxXCandidates[foundMaxX] || 0) + 1;
+        // HPバーのY座標が特定できたら、そのY座標を使ってstartXとmaxXを検出します。
+        // startXの検出: 左からスキャンし、背景色ではない最初のピクセル（グラデーションかバー本体）
+        const X_SCAN_TOLERANCE = COLOR_TOLERANCE * 1.5; // X座標検出の許容値は少し緩めに
+
+        for (let x = 0; x < width; x++) {
+            const pixel = getPixelColor(imageData, x, tempHpBarY);
+            if (!isColorCloseToAnyBackground(pixel, X_SCAN_TOLERANCE)) {
+                startX = x;
+                break;
             }
         }
 
-        startX = Object.keys(startXCandidates).reduce((a, b) => startXCandidates[a] > startXCandidates[b] ? a : b, null);
-        maxX = Object.keys(maxXCandidates).reduce((a, b) => maxXCandidates[a] > maxXCandidates[b] ? a : b, null);
-
-        if (startX !== null) startX = parseInt(startX, 10);
-        if (maxX !== null) maxX = parseInt(maxX, 10);
+        // maxXの検出: 右からスキャンし、背景色ではない最初のピクセル（バーの終点）
+        for (let x = width - 1; x >= 0; x--) {
+            const pixel = getPixelColor(imageData, x, tempHpBarY);
+            if (!isColorCloseToAnyBackground(pixel, X_SCAN_TOLERANCE)) {
+                maxX = x;
+                break;
+            }
+        }
         
         console.log("Detected startX:", startX, "Detected maxX:", maxX);
 
         if (startX === null || maxX === null || maxX <= startX) {
-            resultsDiv.innerHTML = '<p style="color: red;">基準線（左右の白い線）が見つかりませんでした。画像を正しくトリミングしているか確認してください。</p>';
+            resultsDiv.innerHTML = '<p style="color: red;">バーの左右の基準点が見つかりませんでした。画像を正しくトリミングしているか、バーが極端に短い場合は調整が必要かもしれません。</p>';
             return;
         }
 
-        // 2. 各ステータスバーのY座標の特定
+        // ***** 2. 各ステータスバーのY座標の特定 (ここは微調整のみ) *****
         const detectedBarYColors = []; 
 
-        // ***** sampleXForBarY をさらに右に移動 (例: startX + 200) *****
-        // バーの長さが80%あるのであれば、グラデーション部分を確実に避けて、
-        // バー本体の色が安定して現れる位置を狙う
-        const sampleXForBarY = startX + 200; 
+        // バーの内部をサンプリングするX座標
+        // グラデーションの存在を考慮し、バーの長さの約1/4程度の位置をサンプリング
+        const sampleXForBarY = Math.floor(startX + (maxX - startX) * 0.25); // 例: 25%の位置
+        // バーが80%あることを考慮して、もう少し右にするなら例えば 0.4 なども検討
+        // const sampleXForBarY = Math.floor(startX + (maxX - startX) * 0.4); 
+
 
         if (sampleXForBarY < 0 || sampleXForBarY >= width) {
              console.error("sampleXForBarY が画像範囲外です:", sampleXForBarY, "width:", width);
@@ -204,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
             for (const barInfo of STATUS_BARS) {
                 const dr = pixel.r - barInfo.color.r;
                 const dg = pixel.g - barInfo.color.g;
-                const db = pixel.b - barInfo.b;
+                const db = pixel.b - barInfo.color.b; // 修正: barInfo.b -> barInfo.color.b
                 const currentDiff = (dr * dr + dg * dg + db * db);
 
                 if (currentDiff < minColorDiff && currentDiff < (COLOR_TOLERANCE * COLOR_TOLERANCE)) {
@@ -273,6 +269,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // 3. 各ステータスバーの右端 (`currentX`) の検出とパーセンテージ計算
         const finalResults = [];
         const BACKGROUND_TRANSITION_TOLERANCE = COLOR_TOLERANCE * 1.5; 
+        // NO_BAR_COLOR_THRESHOLD の値を調整して、グラデーションの終点を正確に検出できるようにする
+        // グラデーションの長さによっては、この値を増やす必要があるかもしれません。
+        const NO_BAR_COLOR_THRESHOLD = 8; // 以前の 5 から 8 に変更。これでグラデーションを長く許容。
 
         for (let i = 0; i < STATUS_BARS.length; i++) {
             const barInfo = STATUS_BARS[i];
@@ -283,19 +282,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const targetBackgroundColor = isType1Background ? BACKGROUND_COLOR_TYPE1 : BACKGROUND_COLOR_TYPE2;
 
             let noBarColorOrGradationCount = 0; 
-            const NO_BAR_COLOR_THRESHOLD = 5; 
 
             for (let x = startX; x <= maxX; x++) {
                 const pixel = getPixelColor(imageData, x, barY);
                 
                 const isMainBarColor = isColorClose(pixel, barInfo.color, COLOR_TOLERANCE);
                 const isBackgroundColor = isColorClose(pixel, targetBackgroundColor, BACKGROUND_TRANSITION_TOLERANCE);
+                // HPバーのグラデーション開始色を考慮
+                const isGradientColor = isColorClose(pixel, HP_GRADIENT_START_COLOR, COLOR_TOLERANCE * 1.5);
 
-                if (isMainBarColor) {
+                // メインの色、またはグラデーションの色である間はバーが続いていると判断
+                if (isMainBarColor || isGradientColor) {
                     currentX = x;
                     noBarColorOrGradationCount = 0;
                 } else if (!isBackgroundColor) {
-                    // メインの色ではないが、背景色でもない場合（＝グラデーションの可能性が高い）
+                    // メインの色でもグラデーションでもないが、背景色でもない場合（＝おそらくバーのグラデーションの本当に最後の部分やノイズ）
+                    // ここもバーの一部として含めるか、厳しくするかは調整が必要
                     currentX = x; 
                     noBarColorOrGradationCount = 0;
                 } else {
@@ -331,7 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
         navigator.clipboard.writeText(textToCopy.trim()).then(() => {
             alert('結果をコピーしました！');
         }).catch(err => {
-                console.error('コピーに失敗しました:', err);
+            console.error('コピーに失敗しました:', err);
             alert('コピーに失敗しました。手動でコピーしてください。');
         });
     });
