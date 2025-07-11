@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ブレヒロ修練ステータス数値化ツール</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>ブレヒロ修練ステータス数値化ツール</h1>
+
+        <div class="upload-section">
+            <p>ブレヒロの修練画面のスクリーンショットをアップロードしてください。<br>バーのある部分をできるだけトリミングしていただくと、精度が向上します。</p>
+            <input type="file" id="imageUpload" accept="image/*">
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="statusCanvas"></canvas>
+            <div id="overlayMessage" class="overlay-message">画像をアップロードしてください</div>
+        </div>
+
+        <div class="results-section">
+            <h2>結果</h2>
+            <div id="results">
+                <p>画像をアップロードするとここに結果が表示されます。</p>
+            </div>
+            <button id="copyResults" class="hidden">結果をコピー</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

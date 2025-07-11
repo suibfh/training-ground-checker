@@ -1,0 +1,136 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f7f6;
+    color: #333;
+    line-height: 1.6;
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+}
+
+.container {
+    background-color: #ffffff;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    max-width: 900px;
+    width: 100%;
+    margin: 20px auto;
+}
+
+h1, h2 {
+    color: #2c3e50;
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.upload-section, .results-section {
+    margin-bottom: 30px;
+    border-top: 1px solid #eee;
+    padding-top: 20px;
+}
+
+.upload-section p {
+    text-align: center;
+    margin-bottom: 15px;
+    color: #555;
+}
+
+input[type="file"] {
+    display: block;
+    margin: 0 auto 20px auto;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+    cursor: pointer;
+}
+
+input[type="file"]:hover {
+    background-color: #e9e9e9;
+}
+
+.canvas-container {
+    position: relative;
+    width: 100%;
+    /* 高さはJavaScriptで画像の読み込み後に動的に設定 */
+    background-color: #e0e0e0;
+    border: 2px dashed #a0a0a0;
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden; /* 画像がはみ出さないように */
+    margin-bottom: 30px;
+}
+
+#statusCanvas {
+    display: block; /* 余白をなくす */
+    max-width: 100%;
+    height: auto;
+}
+
+.overlay-message {
+    position: absolute;
+    color: #777;
+    font-size: 1.2em;
+    pointer-events: none; /* メッセージを通してcanvasを操作できるように */
+    text-align: center;
+    padding: 20px;
+}
+
+#results {
+    background-color: #eef7ee;
+    border: 1px solid #d4edda;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    min-height: 50px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+#results p {
+    margin: 0;
+    color: #28a745;
+    font-weight: bold;
+}
+
+button {
+    display: block;
+    margin: 0 auto;
+    padding: 12px 25px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+button.hidden {
+    display: none;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .container {
+        padding: 20px;
+    }
+    h1 {
+        font-size: 1.8em;
+    }
+    .upload-section p {
+        font-size: 0.9em;
+    }
+}
