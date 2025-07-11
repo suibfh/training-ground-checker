@@ -259,25 +259,60 @@ document.addEventListener('DOMContentLoaded', () => {
         definiteBarYs.splice(STATUS_BARS.length);
 
 
-        // 3. 各ステータスバーの右端 (`currentX`) の検出とパーセンテージ計算
+// 3. 各ステータスバーの右端 (`currentX`) の検出とパーセンテージ計算
         const finalResults = [];
         for (let i = 0; i < STATUS_BARS.length; i++) {
             const barInfo = STATUS_BARS[i];
             const barY = definiteBarYs[i]; 
             let currentX = startX; // 初期値はバーの開始点
 
-            // バーの開始点から右へ走査し、バーの色が途切れる点を探す
+            // バーの色と背景色、白い枠線を区別するためのロジックを強化
+            // バーのピクセルを検出したら、その直後が白い枠線かどうかを確認する
+            let lastBarColorX = startX; // 最後にバーの色が検出されたX座標
+
             for (let x = startX; x <= maxX; x++) {
                 const pixel = getPixelColor(imageData, x, barY);
+                // 次のピクセルも見て、白い枠線との境界を探る
+                const nextPixel = getPixelColor(imageData, x + 1, barY); // 1ピクセル右のピクセル
+
                 if (isColorClose(pixel, barInfo.color, COLOR_TOLERANCE)) {
-                    currentX = x; // バーの色が続く限りcurrentXを更新
-                } else {
-                    // バーの色が途切れたら終了
-                    // ここで、背景色との差が明確に出るようにCOLOR_TOLERANCEを調整する必要がある
-                    // または、バーの色ではないことを確認する別のロジック
-                    break; 
+                    lastBarColorX = x; // バーの色が見つかったら、X座標を更新
+                } 
+                
+                // バーの色が検出された、かつ、その次のピクセルが白い枠線に近い場合、ここをバーの終点とみなす
+                // または、現在のピクセルがバーの色で、次のピクセルがバーの色ではないが白い枠に近い場合も考慮
+                // 今回はシンプルに、バーの色が途切れた直後が白なら、その直前が終点というロジックで試します
+                if (isColorClose(pixel, barInfo.color, COLOR_TOLERANCE) && 
+                    isColorClose(nextPixel, WHITE_COLOR, COLOR_TOLERANCE)) {
+                    // バーの色があり、その右隣が白い線なら、ここがバーの右端
+                    currentX = x;
+                    break; // これでバーの右端が見つかったと判断
+                }
+                
+                // もしバーの色が途切れて、かつ白い線でもない場合（背景色など）は、
+                // 最後のバーの色だったX座標が終点になる
+                // これは上記ifでbreakしなかった場合のフォールバック
+                if (!isColorClose(pixel, barInfo.color, COLOR_TOLERANCE) && x > startX) {
+                    currentX = lastBarColorX; // 最後にバーの色だったX座標を採用
+                    break;
                 }
             }
+
+            // もしループがmaxXまで到達してもバーの色が途切れなかった場合（バーが100%の場合など）
+            // currentXはmaxXになるべきだが、ループの性質上lastBarColorXが更新されていない可能性がある
+            if (currentX === startX && lastBarColorX > startX) {
+                // ループ中にバーの色が一度も検出されなかった場合（0%の場合）
+                // またはバーが非常に短い場合
+                // ここで改めてlastBarColorXをセットし直す
+                currentX = lastBarColorX; 
+            }
+            if (currentX === startX && lastBarColorX === startX && percentage === 0) {
+                 // 完全に0%の場合（バーの色が見つからなかった場合）はstartXのまま
+            } else if (currentX < startX) {
+                // 計算ミスなどでstartXより小さくなることを防ぐ
+                currentX = startX;
+            }
+
 
             // パーセンテージ計算
             const length = currentX - startX;
