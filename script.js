@@ -21,16 +21,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const WHITE_COLOR = { r: 234, g: 253, b: 255 }; // #EAFDFF (補助線)
 
-    // 新しい背景色の定義
     const BACKGROUND_COLOR_TYPE1 = { r: 70, g: 51, b: 25 }; // #463319 (攻撃、防御、敏捷の背景)
     const BACKGROUND_COLOR_TYPE2 = { r: 88, g: 69, b: 36 }; // #584524 (HP、魔攻、魔防の背景)
 
     /**
      * 指定された座標のピクセルのRGB値を取得
-     * @param {ImageData} imageData - Canvasから取得したImageDataオブジェクト
-     * @param {number} x - X座標
-     * @param {number} y - Y座標
-     * @returns {{r: number, g: number, b: number}} - RGB値
      */
     function getPixelColor(imageData, x, y) {
         if (x < 0 || x >= imageData.width || y < 0 || y >= imageData.height) {
@@ -46,10 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * 2つの色が許容範囲内にあるか判定
-     * @param {{r: number, g: number, b: number}} color1
-     * @param {{r: number, g: number, b: number}} color2
-     * @param {number} tolerance - 許容するRGB値の差
-     * @returns {boolean}
      */
     function isColorClose(color1, color2, tolerance) {
         const dr = color1.r - color2.r;
@@ -60,9 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * ピクセルがどちらかの背景色に近いか判定
-     * @param {{r: number, g: number, b: number}} pixelColor
-     * @param {number} tolerance
-     * @returns {boolean}
      */
     function isColorCloseToAnyBackground(pixelColor, tolerance) {
         return isColorClose(pixelColor, BACKGROUND_COLOR_TYPE1, tolerance) || 
@@ -71,12 +59,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * 指定されたY座標で垂直線を検出する汎用関数
-     * @param {ImageData} imageData
-     * @param {number} y - 走査するY座標
-     * @param {{r: number, g: number, b: number}} targetColor - 検出する色
-     * @param {number} minWidth - 線の最小ピクセル幅
-     * @param {string} direction - 'leftToRight' または 'rightToLeft'
-     * @returns {number | null} - 検出された線のX座標 (線の左端) または null
      */
     function findVerticalLine(imageData, y, targetColor, minWidth, direction) {
         const width = imageData.width;
@@ -186,9 +168,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const detectedBarYColors = []; 
 
         // バーの内部をサンプリングするX座標
-        // グラデーションが始まる前の、色が安定している部分を狙うため、startXから少し右にずらす
-        const sampleXForBarY = startX + 50; 
-        
+        // HPバーの検出精度を上げるため、サンプリング位置を調整
+        // startX + 70 を試す（画像によって調整が必要）
+        const sampleXForBarY = startX + 70; 
+        // あるいは、startXとmaxXの中間点に近づけるように
+        // const sampleXForBarY = Math.floor(startX + (maxX - startX) * 0.2); // 例えば20%の位置
+
         if (sampleXForBarY < 0 || sampleXForBarY >= width) {
              console.error("sampleXForBarY が画像範囲外です:", sampleXForBarY, "width:", width);
              resultsDiv.innerHTML = '<p style="color: red;">内部エラー: バーのY座標検出位置が範囲外です。sampleXForBarYの値を調整してください。</p>';
@@ -199,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const barDetectYEnd = Math.floor(height * 0.9);
         const barDetectStepY = 3;
 
-        const BAR_VERTICAL_SEPARATION_THRESHOLD = 30; // バー間の最小間隔（調整済み）
+        const BAR_VERTICAL_SEPARATION_THRESHOLD = 30; // バー間の最小間隔
 
         for (let y = barDetectYStart; y < barDetectYEnd; y += barDetectStepY) {
             let isTooCloseToDetected = false;
@@ -239,20 +224,17 @@ document.addEventListener('DOMContentLoaded', () => {
         
         detectedBarYColors.sort((a, b) => a.y - b.y);
 
-        const finalBarYsMap = new Map(); // Map<barName, yCoord>
-        const usedYIndices = new Set(); // 既に割り当てたdetectedBarYColorsのインデックス
+        const finalBarYsMap = new Map();
+        const usedYIndices = new Set();
 
-        // STATUS_BARSの順番でY座標を割り当てる
         for (const barInfo of STATUS_BARS) {
             let assignedY = null;
             let bestMatchIndex = -1;
-            let minDiff = Infinity; // Y座標の差ではなく、色が最も近いバーを探すための差
+            let minColorDiffForAssign = Infinity; // 色の差で最適なYを見つける
 
-            // 検出されたY座標と色のペアの中から、STATUS_BARSの現在のバーに最も適したY座標を探す
-            // ここで、単純にY座標が一番近いものを選ぶのではなく、
-            // そのY座標で検出された色が、現在の barInfo.color に最も近いものを選ぶ
+            // 未使用の検出済みY座標の中で、現在のバーの色に最も近いものを探す
             for (let j = 0; j < detectedBarYColors.length; j++) {
-                if (usedYIndices.has(j)) continue; // 既に使われたY座標はスキップ
+                if (usedYIndices.has(j)) continue;
 
                 const detectedItem = detectedBarYColors[j];
                 const colorDiff = Math.sqrt(
@@ -261,19 +243,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     Math.pow(detectedItem.barInfo.color.b - barInfo.color.b, 2)
                 );
 
-                if (colorDiff < minDiff) {
-                    minDiff = colorDiff;
+                if (colorDiff < minColorDiffForAssign) {
+                    minColorDiffForAssign = colorDiff;
                     assignedY = detectedItem.y;
                     bestMatchIndex = j;
                 }
             }
 
-            if (assignedY !== null && minDiff < COLOR_TOLERANCE) { // 許容範囲内で色が見つかった場合
+            // 色の差が許容範囲内で、Y座標が見つかった場合のみ採用
+            // ここで COLOR_TOLERANCE ではなく、少し広めの許容値を使うことも検討
+            if (assignedY !== null && minColorDiffForAssign < (COLOR_TOLERANCE * 1.5)) { // 1.5倍の許容値で試す
                 finalBarYsMap.set(barInfo.name, assignedY);
                 usedYIndices.add(bestMatchIndex);
             } else {
                 console.warn(`Warning: Could not reliably find Y coordinate for ${barInfo.name}. Setting to 0%.`);
-                finalBarYsMap.set(barInfo.name, null); // 見つからなかった場合はnullとする
+                finalBarYsMap.set(barInfo.name, null);
             }
         }
 
@@ -291,42 +275,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 3. 各ステータスバーの右端 (`currentX`) の検出とパーセンテージ計算
         const finalResults = [];
-        // バーの色から背景色へのグラデーションを考慮した閾値
-        const BACKGROUND_TRANSITION_TOLERANCE = COLOR_TOLERANCE * 1.5; // 背景への移行はもう少し寛容に
+        const BACKGROUND_TRANSITION_TOLERANCE = COLOR_TOLERANCE * 1.5; 
 
         for (let i = 0; i < STATUS_BARS.length; i++) {
             const barInfo = STATUS_BARS[i];
             const barY = actualDefiniteBarYs[i]; 
             let currentX = startX;
             
-            // HP、魔攻、魔防の背景
             const isType1Background = (barInfo.name === '攻撃' || barInfo.name === '防御' || barInfo.name === '敏捷');
             const targetBackgroundColor = isType1Background ? BACKGROUND_COLOR_TYPE1 : BACKGROUND_COLOR_TYPE2;
 
-            let noBarColorOrGradationCount = 0; // バーの色でもグラデーションでもない連続カウント
-            const NO_BAR_COLOR_THRESHOLD = 5; // バーの色でもグラデーションでもないピクセルが連続して許容される回数
+            let noBarColorOrGradationCount = 0; 
+            const NO_BAR_COLOR_THRESHOLD = 5; 
 
             for (let x = startX; x <= maxX; x++) {
                 const pixel = getPixelColor(imageData, x, barY);
                 
-                // ピクセルがバーの「メインの色」に近いか
                 const isMainBarColor = isColorClose(pixel, barInfo.color, COLOR_TOLERANCE);
-                
-                // ピクセルが背景色に近いか
                 const isBackgroundColor = isColorClose(pixel, targetBackgroundColor, BACKGROUND_TRANSITION_TOLERANCE);
 
                 if (isMainBarColor) {
-                    currentX = x; // メインの色が見つかったら更新
+                    currentX = x;
                     noBarColorOrGradationCount = 0;
                 } else if (!isBackgroundColor) {
                     // メインの色ではないが、背景色でもない場合（＝グラデーションの可能性が高い）
-                    currentX = x; // グラデーション部分もバーの長さとしてカウント
+                    currentX = x; 
                     noBarColorOrGradationCount = 0;
                 } else {
-                    // 背景色に近い場合
                     noBarColorOrGradationCount++;
                     if (noBarColorOrGradationCount >= NO_BAR_COLOR_THRESHOLD) {
-                        break; // 背景色が一定回数連続したら終了
+                        break; 
                     }
                 }
             }
