@@ -119,6 +119,7 @@ resetDisplay();
 
 const BarAnalyzer = { // オブジェクトとしてまとめる
     // バーの色定義 (RGB) - toleranceは後で使う
+    // IMPORTANT: これらのRGB値は、画像からスポイトツールで正確に取得し、更新してください！
     barColors: {
         hp: { r: 254, g: 104, b: 104 }, // HP 赤
         atk: { r: 104, g: 172, b: 254 }, // 攻撃 青
@@ -128,21 +129,21 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
         spd: { r: 254, g: 254, b: 104 }  // 敏捷 黄
     },
     // トラック (レールの背景) の色
+    // IMPORTANT: このRGB値も、画像からスポイトツールで正確に取得し、更新してください！
     trackBackgroundColor: { r: 41, g: 33, b: 34 }, // 濃い灰色
 
     // UIの外枠の色 (白っぽい色)
-    // IMPORTANT: ここは実際のUI外枠のRGB値に合わせてください！
-    // 例: { r: 240, g: 240, b: 240 } のような白に近い色
+    // IMPORTANT: このRGB値も、画像からスポイトツールで正確に取得し、更新してください！
     uiBorderColor: { r: 240, g: 240, b: 240 }, // <-- この値を画像から正確に取得して設定してください！
 
     // generalBackgroundColor はUI境界検出では使わないためコメントアウトまたは削除
     // generalBackgroundColor: { r: 79, g: 60, b: 31 },
 
     // 色の許容範囲 (RGB各成分の差の絶対値の合計)
-    colorTolerance: 70, // 各色のR,G,B値の差の合計がこの値以下なら一致とみなす
+    // まずは大きくしてバーが検出されるか確認し、その後最適な値に調整してください。
+    colorTolerance: 120, // <-- ここを調整してテストしてみてください。
 
     // UI境界検出用定数 (古いロジックで使われていたが、新しいロジックでは直接使わない)
-    // ただし、uiBorderColorの走査範囲を絞るためのヒントとしては使えるため、そのまま残しておく
     HORIZONTAL_SCAN_START_X_RATIO: 0.1,
     HORIZONTAL_SCAN_END_X_RATIO: 0.9,
     VERTICAL_SCAN_START_Y_RATIO: 0.1,
@@ -170,7 +171,7 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
     // バーの走査開始X座標 (レールの開始Xからの相対比率)
     BAR_SCAN_START_X_RELATIVE_RAIL_RATIO: 0.01,
     // バーの走査終了X座標 (レールの終了Xからの相対比率)
-    BAR_SCAN_END_X_RELATIVE_RAIL_RATIO: 0.99,
+    BAR_SCAN_END_X_RELATIVE_RAIL_RATIO: 0.99, // レール幅の99%までスキャン
 
     // バーのY軸スキャン範囲 (バー中心Yからの上下のピクセル数)
     BAR_SCAN_Y_RANGE: 3, // 中心Yから上下に3ピクセル (計7ピクセル)
@@ -230,7 +231,7 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
         // ピクセルデータを再取得（描画クリア後に）
         const imageData = ctx.getImageData(0, 0, width, height);
 
-        // --- 新しいUI境界検出ロジック ---
+        // --- UI境界検出ロジック (uiBorderColorを使用) ---
         let uiLeft = -1, uiRight = -1, uiTop = -1, uiBottom = -1;
 
         // 1. 左端を検出 (左から右へスキャン)
@@ -370,7 +371,8 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
 
             // バーの走査範囲 (レールの幅に対する相対座標を実際のピクセルに変換)
             const scanPixelStartX = railStartX + Math.floor(railLength * BarAnalyzer.BAR_SCAN_START_X_RELATIVE_RAIL_RATIO);
-            const scanPixelEndX = railStartX + Math.floor(railLength * BarAnalyzer.RAIL_END_X_RELATIVE_UI_RATIO);
+            // 修正: scanPixelEndX はレール全体の長さの比率で計算
+            const scanPixelEndX = railStartX + Math.floor(railLength * BarAnalyzer.BAR_SCAN_END_X_RELATIVE_RAIL_RATIO);
 
 
             // デバッグ: バーY軸スキャンラインを描画 (薄い灰色)
