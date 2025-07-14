@@ -3,31 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ブレヒロ修練ステータス数値化ツール</title>
+    <title>Training Ground Bar Analyzer</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>ブレヒロ修練ステータス数値化ツール</h1>
+    <header>
+        <h1>トレーニング場バー解析ツール</h1>
+    </header>
 
-        <div class="upload-section">
-            <p>ブレヒロの修練画面のスクリーンショットをアップロードしてください。<br>バーのある部分をできるだけトリミングしていただくと、精度が向上します。</p>
-            <input type="file" id="imageUpload" accept="image/*">
-        </div>
+    <main>
+        <section class="upload-section">
+            <h2>画像をアップロード</h2>
+            <input type="file" id="imageUpload" accept="image/jpeg, image/png, image/webp">
+            <p class="instruction">JPEG, PNG, WebP形式の画像をアップロードしてください。</p>
+        </section>
 
-        <div class="canvas-container">
-            <canvas id="statusCanvas"></canvas>
-            <div id="overlayMessage" class="overlay-message">画像をアップロードしてください</div>
-        </div>
-
-        <div class="results-section">
-            <h2>結果</h2>
-            <div id="results">
-                <p>画像をアップロードするとここに結果が表示されます。</p>
+        <section class="preview-section">
+            <h2>プレビュー</h2>
+            <div id="imagePreviewContainer" class="image-container">
+                <img id="imagePreview" src="#" alt="Image Preview" style="display: none;">
+                <canvas id="analysisCanvas" style="display: none;"></canvas>
             </div>
-            <button id="copyResults" class="hidden">結果をコピー</button>
-        </div>
-    </div>
+            <p id="loadingMessage" class="loading-message" style="display: none;">解析中...</p>
+            <p id="errorMessage" class="error-message" style="display: none;"></p>
+        </section>
+
+        <section class="results-section">
+            <h2>解析結果</h2>
+            <div id="resultsDisplay" class="results-display">
+                <p>ここにバーの解析結果が表示されます。</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2023 Training Ground Bar Analyzer</p>
+    </footer>
 
     <script src="script.js"></script>
 </body>
