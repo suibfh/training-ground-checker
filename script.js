@@ -164,7 +164,7 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
     },
 
     // レールの開始X座標 (UI幅に対する相対位置)
-    RAIL_START_X_RELATIVE_UI_RATIO: 0.1,
+    RAIL_START_X_RELATIVE_UI_RATIO: 0.2,
     // レールの終了X座標 (UI幅に対する相対位置)
     RAIL_END_X_RELATIVE_UI_RATIO: 0.96, // 100%時のバーの右端の比率
 
