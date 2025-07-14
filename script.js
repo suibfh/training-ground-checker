@@ -131,7 +131,7 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
     // トラック (レールの背景) の色
     trackBackgroundColor: { r: 41, g: 33, b: 34 }, // 濃い灰色
     // 背景の最も一般的な色 (UI外の背景など)
-    generalBackgroundColor: { r: 141, g: 133, b: 134 }, // 薄い灰色
+    generalBackgroundColor: { r: 79, g: 60, b: 31 }, // 薄い灰色
 
     // 色の許容範囲 (RGB各成分の差の絶対値の合計)
     // PHPのtoleranceは個別のR,G,Bの差ではなく、合計の差でした
