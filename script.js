@@ -117,7 +117,6 @@ resetDisplay();
 
 // --- ここから画像解析ロジック ---
 
-// 2. 定数の定義 (PHP版から移植)
 const BarAnalyzer = { // オブジェクトとしてまとめる
     // バーの色定義 (RGB) - toleranceは後で使う
     barColors: {
@@ -130,27 +129,30 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
     },
     // トラック (レールの背景) の色
     trackBackgroundColor: { r: 41, g: 33, b: 34 }, // 濃い灰色
-    // 背景の最も一般的な色 (UI外の背景など)
-    generalBackgroundColor: { r: 79, g: 60, b: 31 }, // 薄い灰色
+
+    // UIの外枠の色 (白っぽい色)
+    // IMPORTANT: ここは実際のUI外枠のRGB値に合わせてください！
+    // 例: { r: 240, g: 240, b: 240 } のような白に近い色
+    uiBorderColor: { r: 240, g: 240, b: 240 }, // <-- この値を画像から正確に取得して設定してください！
+
+    // generalBackgroundColor はUI境界検出では使わないためコメントアウトまたは削除
+    // generalBackgroundColor: { r: 79, g: 60, b: 31 },
 
     // 色の許容範囲 (RGB各成分の差の絶対値の合計)
-    // PHPのtoleranceは個別のR,G,Bの差ではなく、合計の差でした
-    colorTolerance: 70, // <-- ここを調整してテストしてみてください。前回の推奨値に設定
+    colorTolerance: 70, // 各色のR,G,B値の差の合計がこの値以下なら一致とみなす
 
-    // UI境界検出用定数
-    // 水平方向のスキャン開始X比率 (画像の左端から)
+    // UI境界検出用定数 (古いロジックで使われていたが、新しいロジックでは直接使わない)
+    // ただし、uiBorderColorの走査範囲を絞るためのヒントとしては使えるため、そのまま残しておく
     HORIZONTAL_SCAN_START_X_RATIO: 0.1,
-    // 水平方向のスキャン終了X比率 (画像の左端から)
     HORIZONTAL_SCAN_END_X_RATIO: 0.9,
-    // 垂直方向のスキャン開始Y比率 (画像の上端から)
     VERTICAL_SCAN_START_Y_RATIO: 0.1,
-    // 垂直方向のスキャン終了Y比率 (画像の上端から)
     VERTICAL_SCAN_END_Y_RATIO: 0.9,
+    
     // UIの上下左右の端を見つけるための、端から内側への安全マージン比率
+    // uiBorderColor を使う検出では不要になることが多いが、念のため残す
     UI_SAFE_MARGIN_RATIO: 0.01, // 1%
 
     // バー群のY座標相対比率 (UIの高さに対する相対位置)
-    // 画面の一番上からのUIの高さの比率 + (UIの高さ * 比率)
     BAR_Y_CENTER_RELATIVE_UI_RATIOS: {
         hp: 0.18, // UI上端からHPバーの中心までの比率
         atk: 0.30,
@@ -228,67 +230,105 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
         // ピクセルデータを再取得（描画クリア後に）
         const imageData = ctx.getImageData(0, 0, width, height);
 
-        // 縮小された画像から元の画像へのピクセル比率 (未使用だが念のため残す)
-        // const scaleX = originalImageWidth / width;
-        // const scaleY = originalImageHeight / height;
+        // --- 新しいUI境界検出ロジック ---
+        let uiLeft = -1, uiRight = -1, uiTop = -1, uiBottom = -1;
 
-        // 1. UI境界の検出
-        // 水平スキャンでUIの左右端を検出
-        let uiLeft = -1, uiRight = -1;
-        const scanY = Math.floor(height * 0.5); // 垂直中央付近をスキャン
-        const scanStartX = Math.floor(width * BarAnalyzer.HORIZONTAL_SCAN_START_X_RATIO);
-        const scanEndX = Math.floor(width * BarAnalyzer.HORIZONTAL_SCAN_END_X_RATIO);
+        // 1. 左端を検出 (左から右へスキャン)
+        // Y軸はUIの上部から下部まで広くスキャンする
+        const scanYStartForBorder = Math.floor(height * 0.1); // 画像の上部10%から開始
+        const scanYEndForBorder = Math.floor(height * 0.9);   // 画像の下部90%までスキャン
 
-        // デバッグ: 水平スキャンラインを描画
-        ctx.fillStyle = 'rgba(255, 255, 0, 0.3)'; // 半透明の黄色
-        ctx.fillRect(scanStartX, scanY, scanEndX - scanStartX, 1);
-
-        for (let x = scanStartX; x < scanEndX; x++) {
-            const pixelColor = getPixelColor(imageData, x, scanY);
-            if (pixelColor && !isColorMatch(pixelColor, BarAnalyzer.generalBackgroundColor)) {
-                if (uiLeft === -1) {
-                    uiLeft = x;
+        for (let x = 0; x < width; x++) {
+            let foundBorder = false;
+            for (let y = scanYStartForBorder; y < scanYEndForBorder; y++) {
+                const pixelColor = getPixelColor(imageData, x, y);
+                if (pixelColor && isColorMatch(pixelColor, BarAnalyzer.uiBorderColor, BarAnalyzer.colorTolerance)) {
+                    foundBorder = true;
+                    // デバッグ: 白い枠と判断されたピクセルにマゼンタの点を描画
+                    ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
+                    ctx.fillRect(x, y, 1, 1);
+                    break; // このX座標で枠が見つかったら次のXへ
                 }
+            }
+            if (foundBorder) {
+                uiLeft = x;
+                break; // 左端が見つかったらループ終了
+            }
+        }
+
+        // 2. 右端を検出 (右から左へスキャン)
+        for (let x = width - 1; x >= 0; x--) {
+            let foundBorder = false;
+            for (let y = scanYStartForBorder; y < scanYEndForBorder; y++) {
+                const pixelColor = getPixelColor(imageData, x, y);
+                if (pixelColor && isColorMatch(pixelColor, BarAnalyzer.uiBorderColor, BarAnalyzer.colorTolerance)) {
+                    foundBorder = true;
+                     // デバッグ: 白い枠と判断されたピクセルにマゼンタの点を描画
+                    ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
+                    ctx.fillRect(x, y, 1, 1);
+                    break;
+                }
+            }
+            if (foundBorder) {
                 uiRight = x;
-                // デバッグ: UIと判断されたピクセルを緑で強調
-                ctx.fillStyle = 'rgba(0, 255, 0, 0.5)';
-                ctx.fillRect(x, scanY, 1, 1);
+                break; // 右端が見つかったらループ終了
             }
         }
 
-        // 垂直スキャンでUIの上下端を検出
-        let uiTop = -1, uiBottom = -1;
-        const scanX = Math.floor(width * 0.5); // 水平中央付近をスキャン
-        const scanStartY = Math.floor(height * BarAnalyzer.VERTICAL_SCAN_START_Y_RATIO);
-        const scanEndY = Math.floor(height * BarAnalyzer.VERTICAL_SCAN_END_Y_RATIO);
+        // 3. 上端を検出 (上から下へスキャン)
+        // X軸は検出されたUIの左右端の範囲内でスキャンする
+        // ただし、uiLeft/uiRightがまだ-1の場合に備えて、フォールバックの範囲を設ける
+        const scanXStartForBorder = uiLeft !== -1 ? uiLeft : Math.floor(width * BarAnalyzer.HORIZONTAL_SCAN_START_X_RATIO);
+        const scanXEndForBorder = uiRight !== -1 ? uiRight : Math.floor(width * BarAnalyzer.HORIZONTAL_SCAN_END_X_RATIO);
 
-        // デバッグ: 垂直スキャンラインを描画
-        ctx.fillStyle = 'rgba(255, 0, 255, 0.3)'; // 半透明の紫
-        ctx.fillRect(scanX, scanStartY, 1, scanEndY - scanStartY);
-
-        for (let y = scanStartY; y < scanEndY; y++) {
-            const pixelColor = getPixelColor(imageData, scanX, y);
-            if (pixelColor && !isColorMatch(pixelColor, BarAnalyzer.generalBackgroundColor)) {
-                if (uiTop === -1) {
-                    uiTop = y;
+        for (let y = 0; y < height; y++) {
+            let foundBorder = false;
+            for (let x = scanXStartForBorder; x < scanXEndForBorder; x++) {
+                const pixelColor = getPixelColor(imageData, x, y);
+                if (pixelColor && isColorMatch(pixelColor, BarAnalyzer.uiBorderColor, BarAnalyzer.colorTolerance)) {
+                    foundBorder = true;
+                    // デバッグ: 白い枠と判断されたピクセルにマゼンタの点を描画
+                    ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
+                    ctx.fillRect(x, y, 1, 1);
+                    break;
                 }
-                uiBottom = y;
-                // デバッグ: UIと判断されたピクセルをシアンで強調
-                ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
-                ctx.fillRect(scanX, y, 1, 1);
+            }
+            if (foundBorder) {
+                uiTop = y;
+                break;
             }
         }
 
-        // UI境界の安全マージン適用
-        const uiMarginX = Math.floor(width * BarAnalyzer.UI_SAFE_MARGIN_RATIO);
-        const uiMarginY = Math.floor(height * BarAnalyzer.UI_SAFE_MARGIN_RATIO);
-        uiLeft = Math.max(0, uiLeft + uiMarginX);
-        uiRight = Math.min(width - 1, uiRight - uiMarginX);
-        uiTop = Math.max(0, uiTop + uiMarginY);
-        uiBottom = Math.min(height - 1, uiBottom - uiMarginY);
+        // 4. 下端を検出 (下から上へスキャン)
+        for (let y = height - 1; y >= 0; y--) {
+            let foundBorder = false;
+            for (let x = scanXStartForBorder; x < scanXEndForBorder; x++) {
+                const pixelColor = getPixelColor(imageData, x, y);
+                if (pixelColor && isColorMatch(pixelColor, BarAnalyzer.uiBorderColor, BarAnalyzer.colorTolerance)) {
+                    foundBorder = true;
+                    // デバッグ: 白い枠と判断されたピクセルにマゼンタの点を描画
+                    ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
+                    ctx.fillRect(x, y, 1, 1);
+                    break;
+                }
+            }
+            if (foundBorder) {
+                uiBottom = y;
+                break;
+            }
+        }
+
+        // UI境界の安全マージン適用は、uiBorderColorでの検出では通常不要。
+        // 必要に応じて調整してください。今回は一旦コメントアウトのまま。
+        // const uiMarginX = Math.floor(width * BarAnalyzer.UI_SAFE_MARGIN_RATIO);
+        // const uiMarginY = Math.floor(height * BarAnalyzer.UI_SAFE_MARGIN_RATIO);
+        // uiLeft = Math.max(0, uiLeft + uiMarginX);
+        // uiRight = Math.min(width - 1, uiRight - uiMarginX);
+        // uiTop = Math.max(0, uiTop + uiMarginY);
+        // uiBottom = Math.min(height - 1, uiBottom - uiMarginY);
 
         if (uiLeft === -1 || uiRight === -1 || uiTop === -1 || uiBottom === -1 || uiLeft >= uiRight || uiTop >= uiBottom) {
-            throw new Error("UIの境界を検出できませんでした。画像を確認してください。");
+            throw new Error("UIの境界を検出できませんでした。白い枠が画像内に明確に存在するか確認し、`uiBorderColor`が正確に設定されているか確認してください。");
         }
 
         console.log(`UI Bounds (Canvas Pixels): Top=${uiTop}, Bottom=${uiBottom}, Left=${uiLeft}, Right=${uiRight}`);
@@ -300,7 +340,6 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
         ctx.strokeStyle = 'red';
         ctx.lineWidth = 2;
         ctx.strokeRect(uiLeft, uiTop, uiWidth, uiHeight);
-
 
         // 結果を格納するオブジェクト
         const results = {};
@@ -331,7 +370,7 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
 
             // バーの走査範囲 (レールの幅に対する相対座標を実際のピクセルに変換)
             const scanPixelStartX = railStartX + Math.floor(railLength * BarAnalyzer.BAR_SCAN_START_X_RELATIVE_RAIL_RATIO);
-            const scanPixelEndX = railStartX + Math.floor(railLength * BarAnalyzer.RAIL_END_X_RELATIVE_UI_RATIO); // RAIL_END_X_RELATIVE_UI_RATIO を使う
+            const scanPixelEndX = railStartX + Math.floor(railLength * BarAnalyzer.RAIL_END_X_RELATIVE_UI_RATIO);
 
 
             // デバッグ: バーY軸スキャンラインを描画 (薄い灰色)
@@ -360,7 +399,7 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
                         ctx.fillRect(x, scanY, 1, 1);
                         break; // このX座標でバーの色が見つかったら次のXへ
                     } else if (pixel && isColorMatch(pixel, BarAnalyzer.trackBackgroundColor)) {
-                         // デバッグ: レール背景色だと判断されたピクセルを、少し濃い灰色で描画
+                           // デバッグ: レール背景色だと判断されたピクセルを、少し濃い灰色で描画
                         ctx.fillStyle = 'rgba(41, 33, 34, 0.5)';
                         ctx.fillRect(x, scanY, 1, 1);
                     }
