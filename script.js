@@ -407,20 +407,23 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
                     }
                 }
 
-                // ロジックの変更点:
+                // ロジックの修正:
                 if (isCurrentXAnEdgePixel || isCurrentXABarPixel) {
-                    // 白い縁またはバー本体の色が検出された場合
-                    currentBarX = x; // そのX座標をバーの右端の候補として保持
-                    foundBarOrEdge = true; // バーが見つかったフラグを立てる
+                    // 現在のX座標の列でバーまたは縁の色が見つかった場合
+                    currentBarX = x; // バーの右端の候補としてそのX座標を更新
+                    foundBarOrEdge = true; // バーが見つかった状態に遷移
                 } else if (foundBarOrEdge && isCurrentXATrackBackground) {
-                    // 以前にバーまたは白い縁が見つかった状態 (foundBarOrEdgeがtrue) で、
-                    // 現在のX座標でバー関連の色が見つからず、かつレール背景色が見つかった場合
-                    // これはバーの終端に達したことを意味する
-                    // currentBarX は既に最後にバーまたは縁が見つかったX座標を保持しているので、ここでループを終了
+                    // **重要:** 既にバーが見つかっている状態 (foundBarOrEdgeがtrue) で、
+                    // かつ現在の列でバー関連の色が見つからず、**レール背景色が見つかった場合**
+                    // これは、バーの右端を越えて背景に戻ったことを意味する。
+                    // そのため、これ以上左にスキャンする必要はない。
+                    // currentBarX は最後にバーまたは縁が見つかったX座標を保持しているので、それが最終的なバーの右端となる。
                     break; 
                 }
-                // !foundBarOrEdge && isCurrentXATrackBackground の場合はスキャン継続
-                // バー関連の色が何も見つからない場合はスキャン継続
+                // (補足) !foundBarOrEdge && isCurrentXATrackBackground の場合 (まだバーを見つける前で、背景色の場合) は
+                // ループは継続される。
+                // !foundBarOrEdge && !isCurrentXATrackBackground && (!isCurrentXABarPixel && !isCurrentXAnEdgePixel)
+                // の場合 (まだバーを見つける前で、かつ背景色でもバー色でも縁色でもない場合 = ノイズなど) もループは継続される。
             }
             
             const actualTrackEndX = railEndX; // あるいは定義されたレール終了位置
