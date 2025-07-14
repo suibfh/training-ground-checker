@@ -372,7 +372,8 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
 
             // バーの右端X座標を見つける
             let currentBarX = railStartX; // 初期値はレールの開始点
-            let foundBarEnd = false; // バーの色（または縁）が見つかったかどうかのフラグ
+            let foundBarOrEdge = false; // バーの色（または縁）が見つかったかどうかのフラグ
+            let lastEdgeRightX = railStartX; // ★★ 修正ここから ★★ 白い縁が検出された最も右のX座標を保持する変数
 
             // バーの走査範囲 (レールの幅に対する相対座標を実際のピクセルに変換)
             const scanPixelStartX = railStartX + Math.floor(railLength * BarAnalyzer.BAR_SCAN_START_X_RELATIVE_RAIL_RATIO);
@@ -406,6 +407,9 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
                     // ピクセルがバーの色、または白い縁の色に一致するかチェック
                     if (isColorMatch(pixel, barColor) || isColorMatch(pixel, BarAnalyzer.barEdgeColor)) {
                         isCurrentXABarOrEdgePixel = true; // このX座標でバーまたは縁のピクセルを発見
+                        if (isColorMatch(pixel, BarAnalyzer.barEdgeColor)) { // ★★ 修正ここから ★★
+                            lastEdgeRightX = x; // 白い縁が見つかった場合は、そのX座標を記録
+                        } // ★★ 修正ここまで ★★
                         // デバッグ描画: バーの色だと判断されたピクセルを、そのバーの実際の色の半透明で描画
                         ctx.fillStyle = `rgba(${barColor.r}, ${barColor.g}, ${barColor.b}, 0.5)`;
                         ctx.fillRect(x, scanY, 1, 1);
@@ -419,15 +423,17 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
                 }
 
                 if (isCurrentXABarOrEdgePixel) { // このX座標でバーまたは縁のピクセルが見つかった場合
-                    currentBarX = x; // バーの色または縁の色が見つかった最後のX座標を更新
-                    foundBarEnd = true; // バーの検出が始まったことをマーク
-                } else if (foundBarEnd) {
+                    foundBarOrEdge = true; // バーの検出が始まったことをマーク
+                    // currentBarX = x; // ここでは更新しない。最後に検出された白い縁の右端を使うため。
+                } else if (foundBarOrEdge) {
                     // 一度バーの色または縁が見つかった後で、
                     // 今回のX座標ではバーの色も縁の色も見つからなかった場合
                     // => バーが終了したと判断し、スキャンを停止
+                    currentBarX = lastEdgeRightX; // ★★ 修正ここから ★★ 最後に検出された白い縁の右端を最終的なバーの右端とする
                     break;
                 }
             }
+            // ★★ 修正ここまで ★★
             
             // PHP版のロジックではtrackEndXは固定値を使っていたので、ここでは railEndX をそのまま使います
             const actualTrackEndX = railEndX; // あるいは定義されたレール終了位置
