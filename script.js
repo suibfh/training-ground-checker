@@ -1,6 +1,6 @@
 // script.js
 
-// 1. DOM要素の取得 (変更なし)
+// 1. DOM要素の取得
 const imageUpload = document.getElementById('imageUpload');
 const imagePreview = document.getElementById('imagePreview');
 const imagePreviewContainer = document.getElementById('imagePreviewContainer');
@@ -12,7 +12,7 @@ const resultsDisplay = document.getElementById('resultsDisplay');
 // Canvasのコンテキスト
 const ctx = analysisCanvas.getContext('2d');
 
-// 初期表示のリセット (変更なし)
+// 初期表示のリセット
 function resetDisplay() {
     imagePreview.style.display = 'none';
     analysisCanvas.style.display = 'none';
@@ -22,7 +22,7 @@ function resetDisplay() {
     imagePreview.src = '#'; // 前の画像をリセット
 }
 
-// エラーメッセージを表示する関数 (変更なし)
+// エラーメッセージを表示する関数
 function showErrorMessage(message) {
     errorMessage.textContent = message;
     errorMessage.style.display = 'block';
@@ -30,7 +30,7 @@ function showErrorMessage(message) {
     console.error(message); // コンソールにも出力
 }
 
-// 2. イベントリスナーの設定 (handleImageUploadの呼び出し変更)
+// 2. イベントリスナーの設定
 imageUpload.addEventListener('change', handleImageUpload);
 
 /**
@@ -58,21 +58,18 @@ async function handleImageUpload(event) {
         const imageUrl = URL.createObjectURL(file);
         
         const img = new Image();
-        img.onload = async () => { // onloadをasyncにする
+        img.onload = async () => {
             // プレビューの表示
             imagePreview.src = imageUrl;
             imagePreview.style.display = 'block';
 
             // Canvasのセットアップ
-            // プレビューサイズに合わせてCanvasも調整する (max-heightをCSSから読み取る)
-            // CSSから計算されたスタイルを取得
             const computedStyle = window.getComputedStyle(imagePreviewContainer);
-            const maxHeightPx = parseFloat(computedStyle.maxHeight) || 400; // CSSでmax-heightが設定されていなければデフォルト400px
+            const maxHeightPx = parseFloat(computedStyle.maxHeight) || 400;
 
             let width = img.width;
             let height = img.height;
 
-            // アスペクト比を維持しつつ、コンテナに収まるように調整
             const aspectRatio = width / height;
             const containerAspectRatio = imagePreviewContainer.offsetWidth / maxHeightPx;
 
@@ -90,12 +87,12 @@ async function handleImageUpload(event) {
             analysisCanvas.height = height;
             
             // Canvasに画像を描画 (縮小して描画される)
-            // drawImageの第三、第四引数は描画先の幅と高さ
             ctx.drawImage(img, 0, 0, analysisCanvas.width, analysisCanvas.height);
             analysisCanvas.style.display = 'block';
 
             // ここで画像解析を実行！
-            await analyzeImage(analysisCanvas, img.width, img.height); // img.width, img.heightはオリジナル画像のサイズ
+            // analyzeImage関数にimgオブジェクトを渡すように変更（再描画のために使用）
+            await analyzeImage(analysisCanvas, img, img.width, img.height); 
 
             loadingMessage.style.display = 'none';
             URL.revokeObjectURL(imageUrl);
@@ -114,7 +111,7 @@ async function handleImageUpload(event) {
     }
 }
 
-// 初期化時に一度表示をリセット (変更なし)
+// 初期化時に一度表示をリセット
 resetDisplay();
 
 
@@ -138,7 +135,7 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
 
     // 色の許容範囲 (RGB各成分の差の絶対値の合計)
     // PHPのtoleranceは個別のR,G,Bの差ではなく、合計の差でした
-    colorTolerance: 20, // 各色のR,G,B値の差の合計がこの値以下なら一致とみなす
+    colorTolerance: 70, // <-- ここを調整してテストしてみてください。前回の推奨値に設定
 
     // UI境界検出用定数
     // 水平方向のスキャン開始X比率 (画像の左端から)
@@ -202,7 +199,7 @@ function getPixelColor(imageData, x, y) {
     if (x < 0 || x >= imageData.width || y < 0 || y >= imageData.height) {
         return null; // 範囲外
     }
-    const index = (y * imageData.width + x) * 4;
+    const index = (Math.floor(y) * imageData.width + Math.floor(x)) * 4; // x,y座標を整数に丸める
     return {
         r: imageData.data[index],
         g: imageData.data[index + 1],
@@ -213,58 +210,72 @@ function getPixelColor(imageData, x, y) {
 /**
  * 画像解析を実行するメイン関数
  * @param {HTMLCanvasElement} canvas - 解析対象のCanvas要素
+ * @param {HTMLImageElement} originalImage - 元の画像オブジェクト（再描画用）
  * @param {number} originalImageWidth - 元画像の幅
  * @param {number} originalImageHeight - 元画像の高さ
  */
-async function analyzeImage(canvas, originalImageWidth, originalImageHeight) {
+async function analyzeImage(canvas, originalImage, originalImageWidth, originalImageHeight) {
     errorMessage.style.display = 'none'; // 新しい解析開始時にエラーメッセージを非表示に
     resultsDisplay.innerHTML = '<p>解析中...</p>'; // 結果表示エリアをリセット
+
+    // Canvasをクリアして元の画像を再描画 (デバッグ描画の前に)
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height); // imgオブジェクトを使って再描画
 
     try {
         const width = canvas.width;
         const height = canvas.height;
+        // ピクセルデータを再取得（描画クリア後に）
         const imageData = ctx.getImageData(0, 0, width, height);
 
-        // 縮小された画像から元の画像へのピクセル比率
-        const scaleX = originalImageWidth / width;
-        const scaleY = originalImageHeight / height;
+        // 縮小された画像から元の画像へのピクセル比率 (未使用だが念のため残す)
+        // const scaleX = originalImageWidth / width;
+        // const scaleY = originalImageHeight / height;
 
         // 1. UI境界の検出
         // 水平スキャンでUIの左右端を検出
         let uiLeft = -1, uiRight = -1;
-        // 垂直中央付近をスキャン（画像全体の高さの50%の位置）
-        const scanY = Math.floor(height * 0.5); 
-        // スキャン範囲を画像の10%から90%に限定
+        const scanY = Math.floor(height * 0.5); // 垂直中央付近をスキャン
         const scanStartX = Math.floor(width * BarAnalyzer.HORIZONTAL_SCAN_START_X_RATIO);
         const scanEndX = Math.floor(width * BarAnalyzer.HORIZONTAL_SCAN_END_X_RATIO);
+
+        // デバッグ: 水平スキャンラインを描画
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.3)'; // 半透明の黄色
+        ctx.fillRect(scanStartX, scanY, scanEndX - scanStartX, 1);
 
         for (let x = scanStartX; x < scanEndX; x++) {
             const pixelColor = getPixelColor(imageData, x, scanY);
             if (pixelColor && !isColorMatch(pixelColor, BarAnalyzer.generalBackgroundColor)) {
-                // 一般的な背景色でないピクセルが見つかったらUIの開始と判断
                 if (uiLeft === -1) {
                     uiLeft = x;
                 }
-                uiRight = x; // 最後の非背景色が右端
+                uiRight = x;
+                // デバッグ: UIと判断されたピクセルを緑で強調
+                ctx.fillStyle = 'rgba(0, 255, 0, 0.5)';
+                ctx.fillRect(x, scanY, 1, 1);
             }
         }
 
         // 垂直スキャンでUIの上下端を検出
         let uiTop = -1, uiBottom = -1;
-        // 水平中央付近をスキャン（画像全体の幅の50%の位置）
-        const scanX = Math.floor(width * 0.5);
-        // スキャン範囲を画像の10%から90%に限定
+        const scanX = Math.floor(width * 0.5); // 水平中央付近をスキャン
         const scanStartY = Math.floor(height * BarAnalyzer.VERTICAL_SCAN_START_Y_RATIO);
         const scanEndY = Math.floor(height * BarAnalyzer.VERTICAL_SCAN_END_Y_RATIO);
+
+        // デバッグ: 垂直スキャンラインを描画
+        ctx.fillStyle = 'rgba(255, 0, 255, 0.3)'; // 半透明の紫
+        ctx.fillRect(scanX, scanStartY, 1, scanEndY - scanStartY);
 
         for (let y = scanStartY; y < scanEndY; y++) {
             const pixelColor = getPixelColor(imageData, scanX, y);
             if (pixelColor && !isColorMatch(pixelColor, BarAnalyzer.generalBackgroundColor)) {
-                // 一般的な背景色でないピクセルが見つかったらUIの開始と判断
                 if (uiTop === -1) {
                     uiTop = y;
                 }
-                uiBottom = y; // 最後の非背景色が下端
+                uiBottom = y;
+                // デバッグ: UIと判断されたピクセルをシアンで強調
+                ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
+                ctx.fillRect(scanX, y, 1, 1);
             }
         }
 
@@ -284,6 +295,12 @@ async function analyzeImage(canvas, originalImageWidth, originalImageHeight) {
 
         const uiWidth = uiRight - uiLeft + 1;
         const uiHeight = uiBottom - uiTop + 1;
+
+        // デバッグ: 確定したUI境界を赤い線で描画
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(uiLeft, uiTop, uiWidth, uiHeight);
+
 
         // 結果を格納するオブジェクト
         const results = {};
@@ -314,7 +331,19 @@ async function analyzeImage(canvas, originalImageWidth, originalImageHeight) {
 
             // バーの走査範囲 (レールの幅に対する相対座標を実際のピクセルに変換)
             const scanPixelStartX = railStartX + Math.floor(railLength * BarAnalyzer.BAR_SCAN_START_X_RELATIVE_RAIL_RATIO);
-            const scanPixelEndX = railStartX + Math.floor(railLength * BarAnalyzer.BAR_SCAN_END_X_RELATIVE_RAIL_RATIO);
+            const scanPixelEndX = railStartX + Math.floor(railLength * BarAnalyzer.RAIL_END_X_RELATIVE_UI_RATIO); // RAIL_END_X_RELATIVE_UI_RATIO を使う
+
+
+            // デバッグ: バーY軸スキャンラインを描画 (薄い灰色)
+            ctx.strokeStyle = 'rgba(150, 150, 150, 0.3)';
+            ctx.lineWidth = 1;
+            for (let yOffset = -BarAnalyzer.BAR_SCAN_Y_RANGE; yOffset <= BarAnalyzer.BAR_SCAN_Y_RANGE; yOffset++) {
+                const currentScanY = barY + yOffset;
+                ctx.beginPath();
+                ctx.moveTo(scanPixelStartX, currentScanY);
+                ctx.lineTo(scanPixelEndX, currentScanY);
+                ctx.stroke();
+            }
 
             // 右へスキャンしてバーの終端を見つける
             for (let x = scanPixelStartX; x <= scanPixelEndX; x++) {
@@ -323,9 +352,17 @@ async function analyzeImage(canvas, originalImageWidth, originalImageHeight) {
                 for (let yOffset = -BarAnalyzer.BAR_SCAN_Y_RANGE; yOffset <= BarAnalyzer.BAR_SCAN_Y_RANGE; yOffset++) {
                     const scanY = barY + yOffset;
                     const pixel = getPixelColor(imageData, x, scanY);
+                    
                     if (pixel && isColorMatch(pixel, barColor)) {
                         isBarPixel = true;
+                        // デバッグ: バーの色だと判断されたピクセルを、そのバーの実際の色の半透明で描画
+                        ctx.fillStyle = `rgba(${barColor.r}, ${barColor.g}, ${barColor.b}, 0.5)`;
+                        ctx.fillRect(x, scanY, 1, 1);
                         break; // このX座標でバーの色が見つかったら次のXへ
+                    } else if (pixel && isColorMatch(pixel, BarAnalyzer.trackBackgroundColor)) {
+                         // デバッグ: レール背景色だと判断されたピクセルを、少し濃い灰色で描画
+                        ctx.fillStyle = 'rgba(41, 33, 34, 0.5)';
+                        ctx.fillRect(x, scanY, 1, 1);
                     }
                 }
 
@@ -338,35 +375,8 @@ async function analyzeImage(canvas, originalImageWidth, originalImageHeight) {
                     break;
                 }
             }
-
-            // レールの右端X座標を見つける
-            let trackEndX = railEndX; // 初期値は定義されたレールの右端
-
-            // 右へスキャンしてレールの終端（背景色）を見つける
-            // レールはトラック背景色で構成されている
-            for (let x = scanPixelStartX; x <= railEndX; x++) { // レールの定義された範囲までスキャン
-                let isTrackBackground = false;
-                for (let yOffset = -BarAnalyzer.BAR_SCAN_Y_RANGE; yOffset <= BarAnalyzer.BAR_SCAN_Y_RANGE; yOffset++) {
-                    const scanY = barY + yOffset;
-                    const pixel = getPixelColor(imageData, x, scanY);
-                    if (pixel && isColorMatch(pixel, BarAnalyzer.trackBackgroundColor)) {
-                        isTrackBackground = true;
-                        break;
-                    }
-                }
-                if (isTrackBackground) {
-                    trackEndX = x; // トラック背景色が見つかった最後のX座標を更新
-                } else if (trackEndX !== railEndX) { // レール背景色が見つからなくなった場合
-                    // トラック背景色が途切れたら、そこが実質的なトラックの終わり
-                    // ただし、トラックは最後まで埋まっているはずなので、このロジックはバーの検出とは逆
-                    // PHP版のロジックを忠実に再現するなら、railEndXをそのまま使うことが多い
-                    // ここでは、定義されたrailEndXを信頼し、もしトラック背景色が見つからなかったらrailEndXとする
-                    // 複雑になるので、一旦railEndXをそのまま使う
-                }
-            }
             
             // PHP版のロジックではtrackEndXは固定値を使っていたので、ここでは railEndX をそのまま使います
-            // もし trackEndX の動的な検出が必要であれば、別途ロジックを追加検討
             const actualTrackEndX = railEndX; // あるいは定義されたレール終了位置
 
             // パーセンテージ計算
