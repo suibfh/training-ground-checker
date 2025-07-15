@@ -141,7 +141,12 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
 
     // 色の許容範囲 (RGB各成分の差の絶対値の合計)
     // まずは大きくしてバーが検出されるか確認し、その後最適な値に調整してください。
-    colorTolerance: 150, // <-- ここを調整してテストしてみてください。
+    colorTolerance: 150, // <-- ここを調整してテストしてみてください。（バーの色検出用）
+
+    // UI境界検出専用の色の許容範囲（uiBorderColorとisColorMatchで使う）
+    // uiBorderColorとbarEdgeColorの区別が難しい場合でも、ここを調整して試してください。
+    // まずは50-100程度から試すのが良いかもしれません。
+    uiBorderTolerance: 50, // <-- ここを調整してテストしてみてください。（UI外枠検出用）
 
     // バーの縁の色 (RGB) - ここを実際の白い縁の色に設定してください！
     barEdgeColor: { r: 255, g: 255, b: 255 }, // 例: 真っ白の場合。正確なRGB値を画像から取得して設定してください。
@@ -154,6 +159,10 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
     
     // UIの上下左右の端を見つけるための、端から内側への安全マージン比率
     UI_SAFE_MARGIN_RATIO: 0.01, // 1%
+
+    // UI右端をスキャンするX軸の開始比率（画像の右端からの割合、例: 0.85 は画像の85%から右端まで）
+    // この値を調整して、UI外枠の右端が確実に含まれるようにしてください。
+    UI_RIGHT_SCAN_START_X_RATIO: 0.85, // 画像幅の85%地点から右端までをスキャン
 
     // バー群のY座標相対比率 (UIの高さに対する相対位置)
     BAR_Y_CENTER_RELATIVE_UI_RATIOS: {
@@ -236,16 +245,17 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
         // --- UI境界検出ロジック (uiBorderColorを使用) ---
         let uiLeft = -1, uiRight = -1, uiTop = -1, uiBottom = -1;
 
-        // 1. 左端を検出 (左から右へスキャン)
         // Y軸はUIの上部から下部まで広くスキャンする
         const scanYStartForBorder = Math.floor(height * 0.1); // 画像の上部10%から開始
         const scanYEndForBorder = Math.floor(height * 0.9);    // 画像の下部90%までスキャン
 
+        // 1. 左端を検出 (左から右へスキャン)
         for (let x = 0; x < width; x++) {
             let foundBorder = false;
             for (let y = scanYStartForBorder; y < scanYEndForBorder; y++) {
                 const pixelColor = getPixelColor(imageData, x, y);
-                if (pixelColor && isColorMatch(pixelColor, BarAnalyzer.uiBorderColor, BarAnalyzer.colorTolerance)) {
+                // UI境界検出には BarAnalyzer.uiBorderTolerance を使用
+                if (pixelColor && isColorMatch(pixelColor, BarAnalyzer.uiBorderColor, BarAnalyzer.uiBorderTolerance)) {
                     foundBorder = true;
                     // デバッグ: 白い枠と判断されたピクセルにマゼンタの点を描画
                     ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
@@ -259,14 +269,18 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
             }
         }
 
-        // 2. 右端を検出 (右から左へスキャン)
-        for (let x = width - 1; x >= 0; x--) {
+        // 2. 右端を検出 (右から左へスキャン) - X軸スキャン範囲を限定
+        const scanXStartForUiRight = Math.floor(width * BarAnalyzer.UI_RIGHT_SCAN_START_X_RATIO); // 画像幅のX%地点からスキャン開始
+        const scanXEndForUiRight = width - 1; // 画像の右端まで
+
+        for (let x = scanXEndForUiRight; x >= scanXStartForUiRight; x--) {
             let foundBorder = false;
             for (let y = scanYStartForBorder; y < scanYEndForBorder; y++) {
                 const pixelColor = getPixelColor(imageData, x, y);
-                if (pixelColor && isColorMatch(pixelColor, BarAnalyzer.uiBorderColor, BarAnalyzer.colorTolerance)) {
+                // UI境界検出には BarAnalyzer.uiBorderTolerance を使用
+                if (pixelColor && isColorMatch(pixelColor, BarAnalyzer.uiBorderColor, BarAnalyzer.uiBorderTolerance)) {
                     foundBorder = true;
-                     // デバッグ: 白い枠と判断されたピクセルにマゼンタの点を描画
+                    // デバッグ: 白い枠と判断されたピクセルにマゼンタの点を描画
                     ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
                     ctx.fillRect(x, y, 1, 1);
                     break;
@@ -278,6 +292,24 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
             }
         }
 
+        // uiRight が検出されなかった場合のフォールバック処理
+        if (uiRight === -1) {
+            console.warn("限定された範囲でUIの右端の外枠を検出できませんでした。uiLeftと仮定のUI幅から計算します。");
+            // uiLeftが検出されている前提で、仮のUI幅からuiRightを計算
+            // ここで使われる比率も、BarAnalyzerに定数として定義し、調整可能にすると良い
+            if (uiLeft !== -1) {
+                // 例: UIの幅が全体の70%程度と仮定
+                const assumedUiWidthRatio = 0.7; // <-- この比率も画像に合わせて調整してください
+                uiRight = uiLeft + Math.floor(width * assumedUiWidthRatio);
+                // ただし、Canvasの右端を超えないようにする
+                uiRight = Math.min(uiRight, width - 1);
+            } else {
+                // uiLeftも検出できていない場合はエラーをスロー
+                 throw new Error("UIの左端と右端の境界を検出できませんでした。`uiBorderColor`が正確に設定されているか確認してください。");
+            }
+        }
+
+
         // 3. 上端を検出 (上から下へスキャン)
         // X軸は検出されたUIの左右端の範囲内でスキャンする
         // ただし、uiLeft/uiRightがまだ-1の場合に備えて、フォールバックの範囲を設ける
@@ -288,7 +320,8 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
             let foundBorder = false;
             for (let x = scanXStartForBorder; x < scanXEndForBorder; x++) {
                 const pixelColor = getPixelColor(imageData, x, y);
-                if (pixelColor && isColorMatch(pixelColor, BarAnalyzer.uiBorderColor, BarAnalyzer.colorTolerance)) {
+                // UI境界検出には BarAnalyzer.uiBorderTolerance を使用
+                if (pixelColor && isColorMatch(pixelColor, BarAnalyzer.uiBorderColor, BarAnalyzer.uiBorderTolerance)) {
                     foundBorder = true;
                     // デバッグ: 白い枠と判断されたピクセルにマゼンタの点を描画
                     ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
@@ -307,7 +340,8 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
             let foundBorder = false;
             for (let x = scanXStartForBorder; x < scanXEndForBorder; x++) {
                 const pixelColor = getPixelColor(imageData, x, y);
-                if (pixelColor && isColorMatch(pixelColor, BarAnalyzer.uiBorderColor, BarAnalyzer.colorTolerance)) {
+                // UI境界検出には BarAnalyzer.uiBorderTolerance を使用
+                if (pixelColor && isColorMatch(pixelColor, BarAnalyzer.uiBorderColor, BarAnalyzer.uiBorderTolerance)) {
                     foundBorder = true;
                     // デバッグ: 白い枠と判断されたピクセルにマゼンタの点を描画
                     ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
@@ -330,7 +364,7 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
         // uiTop = Math.max(0, uiTop + uiMarginY);
         // uiBottom = Math.min(height - 1, uiBottom - uiMarginY);
 
-        if (uiLeft === -1 || uiRight === -1 || uiTop === -1 || uiBottom === -1 || uiLeft >= uiRight || uiTop >= uiBottom) {
+        if (uiLeft === -1 || uiTop === -1 || uiBottom === -1 || uiLeft >= uiRight || uiTop >= uiBottom) { // uiRightのチェックはフォールバックで対応するため、ここではuiLeftが検出されていればOK
             throw new Error("UIの境界を検出できませんでした。白い枠が画像内に明確に存在するか確認し、`uiBorderColor`が正確に設定されているか確認してください。");
         }
 
@@ -369,9 +403,7 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
 
             // バーの右端X座標を見つける
             let currentBarX = railStartX; // 初期値はレールの開始点
-            // ★★ 修正ここから ★★
             let scanningBar = false;     // バーの色または縁の色をスキャン中かどうかのフラグ
-            // ★★ 修正ここまで ★★
 
             // バーの走査範囲 (レールの幅に対する相対座標を実際のピクセルに変換)
             const scanPixelStartX = railStartX + Math.floor(railLength * BarAnalyzer.BAR_SCAN_START_X_RELATIVE_RAIL_RATIO);
@@ -391,10 +423,8 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
 
             // 右へスキャンしてバーの終端を見つける
             for (let x = scanPixelStartX; x <= scanPixelEndX; x++) {
-                // ★★ 修正ここから ★★
                 let foundAnyBarRelatedPixelInColumn = false; // 現在のX座標の列で、バー関連の色が見つかったか
-                // ★★ 修正ここまで ★★
-
+                
                 // バーの中心Yから上下にスキャン範囲を広げて色を確認
                 for (let yOffset = -BarAnalyzer.BAR_SCAN_Y_RANGE; yOffset <= BarAnalyzer.BAR_SCAN_Y_RANGE; yOffset++) {
                     const scanY = barY + yOffset;
@@ -406,10 +436,8 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
 
                     // ピクセルがバーの色、または白い縁の色に一致するかチェック
                     if (isColorMatch(pixel, barColor) || isColorMatch(pixel, BarAnalyzer.barEdgeColor)) {
-                        // ★★ 修正ここから ★★
                         foundAnyBarRelatedPixelInColumn = true;
                         scanningBar = true; // バーの検出が始まった
-                        // ★★ 修正ここまで ★★
                         // デバッグ描画: バーの色だと判断されたピクセルを、そのバーの実際の色の半透明で描画
                         ctx.fillStyle = `rgba(${barColor.r}, ${barColor.g}, ${barColor.b}, 0.5)`;
                         ctx.fillRect(x, scanY, 1, 1);
@@ -422,7 +450,6 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
                     }
                 }
 
-                // ★★ 修正ここから ★★
                 // バー関連のピクセルが見つかった場合、currentBarXを更新
                 if (foundAnyBarRelatedPixelInColumn) {
                     currentBarX = x;
@@ -434,7 +461,6 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
                     // そのため、breakしてループを終了する
                     break; 
                 }
-                // ★★ 修正ここまで ★★
             }
             
             // PHP版のロジックではtrackEndXは固定値を使っていたので、ここでは railEndX をそのまま使います
