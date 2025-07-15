@@ -204,6 +204,17 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
     PERCENTAGE_ADJUSTMENT: -0.8, // 例えば1.8%を加算
 };
 
+// バー名の表示用マッピング
+const BarNameMap = {
+    hp: 'HP',
+    atk: '攻撃',
+    matk: '魔攻',
+    def: '防御',
+    mdef: '魔防',
+    spd: '敏捷'
+};
+
+
 /**
  * 2つの色のRGB値を比較し、指定された許容範囲内にあるかチェックする
  * @param {object} color1 - {r, g, b} 形式のRGB値
@@ -395,9 +406,9 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
         const uiHeight = uiBottom - uiTop + 1;
 
         // --- 補助線描画: 確定したUI境界 (赤い線) ---
-        // ctx.strokeStyle = 'red';
-        // ctx.lineWidth = 2;
-        // ctx.strokeRect(uiLeft, uiTop, uiWidth, uiHeight);
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(uiLeft, uiTop, uiWidth, uiHeight);
         // --- 補助線描画ここまで ---
 
         // ★★★★ グローバルなrailStartXの検出ロジック ★★★★
@@ -473,12 +484,12 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
         }
 
         // --- 補助線描画: 検出された globalRailStartX (黄色の線) ---
-        // ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'; // 黄色の線
-        // ctx.lineWidth = 2;
-        // ctx.beginPath();
-        // ctx.moveTo(globalRailStartX, uiTop); // UIの高さ全体に線を引く
-        // ctx.lineTo(globalRailStartX, uiBottom);
-        // ctx.stroke();
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'; // 黄色の線
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(globalRailStartX, uiTop); // UIの高さ全体に線を引く
+        ctx.lineTo(globalRailStartX, uiBottom);
+        ctx.stroke();
         // --- 補助線描画ここまで ---
 
         console.log(`[DEBUG] Global Rail Start X detected at: ${globalRailStartX}`);
@@ -664,30 +675,31 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
             // 解析結果のデバッグ表示 (コンソール)
             console.log(`[DEBUG] ${barName.toUpperCase()}: BarY=${barY}, CurrentBarX=${currentBarX}, RailStartX=${railStartX}, ActualTrackEndX=${actualTrackEndX}, Percentage=${percentage.toFixed(0)}%`);
 
+            // 日本語表示に変換してHTMLを生成
             resultHtml.push(`
                 <p>
-                    <span class="label">${barName.toUpperCase()}:</span>
+                    <span class="label">${BarNameMap[barName] || barName.toUpperCase()}:</span>
                     <span>${results[barName]}%</span>
                 </p>
             `);
 
             // (オプション) Canvasに解析結果をオーバーレイ描画
             // --- 補助線描画: バーの右端 (赤い線) ---
-            // ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)'; // 赤い線
-            // ctx.lineWidth = 2;
-            // ctx.beginPath();
-            // ctx.moveTo(currentBarX, barY - 5);
-            // ctx.lineTo(currentBarX, barY + 5);
-            // ctx.stroke();
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)'; // 赤い線
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(currentBarX, barY - 5);
+            ctx.lineTo(currentBarX, barY + 5);
+            ctx.stroke();
             // --- 補助線描画ここまで ---
 
             // --- 補助線描画: 検出されたactualTrackEndX (緑の線) ---
-            // ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)'; // 緑の線
-            // ctx.lineWidth = 2;
-            // ctx.beginPath();
-            // ctx.moveTo(actualTrackEndX, barY - 10);
-            // ctx.lineTo(actualTrackEndX, barY + 10);
-            // ctx.stroke();
+            ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)'; // 緑の線
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(actualTrackEndX, barY - 10);
+            ctx.lineTo(actualTrackEndX, barY + 10);
+            ctx.stroke();
             // --- 補助線描画ここまで ---
         }
 
