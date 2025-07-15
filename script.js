@@ -346,13 +346,13 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
             }
 
             // バーの右端X座標を見つける
-            // 初期値はレールの右端 (100%の位置)。これより左のピクセルが終端となる。
+            // 初期値はレールの右端 (100%の位置) に設定
             let currentBarX = railEndX; 
             let foundBarOrEdge = false; // バーの色または縁の色が検出されたかどうかのフラグ
 
-            // スキャン開始位置は railEndX から開始。
-            // 余裕を持たせるなら railEndX + 数ピクセルも検討できるが、画像を見る限り railEndX で十分
-            const scanStartX = railEndX; 
+            // スキャン開始位置を railEndX より少し右にずらす (+5ピクセル)
+            // Canvasの幅を超えないように上限を設定
+            const scanStartX = Math.min(railEndX + 5, width - 1); 
 
             // デバッグ: バーY軸スキャンラインを描画 (薄い灰色)
             ctx.strokeStyle = 'rgba(150, 150, 150, 0.3)';
@@ -368,9 +368,9 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
             // 右から左へスキャンしてバーの終端を見つける
             // scanStartX から railStartX まで (含む) スキャン
             for (let x = scanStartX; x >= railStartX; x--) {
-                let pixelFoundBarColor = false;
-                let pixelFoundBarEdgeColor = false;
-                let pixelFoundTrackBackgroundColor = false;
+                let isCurrentXABarPixel = false; // 現在のX座標の列でバー本体の色が見つかったか
+                let isCurrentXAnEdgePixel = false; // 現在のX座標の列で白い縁の色が見つかったか
+                let isCurrentXATrackBackground = false; // 現在のX座標の列でレール背景色が見つかったか
 
                 // バーの中心Yから上下にスキャン範囲を広げて色を確認
                 for (let yOffset = -BarAnalyzer.BAR_SCAN_Y_RANGE; yOffset <= BarAnalyzer.BAR_SCAN_Y_RANGE; yOffset++) {
@@ -381,27 +381,38 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
                         continue;
                     }
 
-                    if (isColorMatch(pixel, barColor)) {
-                        pixelFoundBarColor = true;
+                    // 白い縁の色に一致するかチェック
+                    if (isColorMatch(pixel, BarAnalyzer.barEdgeColor)) {
+                        isCurrentXAnEdgePixel = true;
+                        // デバッグ描画: 白い縁だと判断されたピクセルを、そのバーの実際の色の半透明で描画
                         ctx.fillStyle = `rgba(${barColor.r}, ${barColor.g}, ${barColor.b}, 0.5)`;
                         ctx.fillRect(x, scanY, 1, 1);
-                    } else if (isColorMatch(pixel, BarAnalyzer.barEdgeColor)) {
-                        pixelFoundBarEdgeColor = true;
-                        ctx.fillStyle = `rgba(${barColor.r}, ${barColor.g}, ${barColor.b}, 0.5)`; // 縁もバーの色でデバッグ描画
+                        break; // このX座標で縁が見つかったら、yOffsetのループは終了し、このX座標の判定に進む
+                    } 
+                    // バー本体の色に一致するかチェック
+                    else if (isColorMatch(pixel, barColor)) { // barColor は個別のバーの色 (HPなら黄色など)
+                        isCurrentXABarPixel = true;
+                        // デバッグ描画: バーの色だと判断されたピクセルを、そのバーの実際の色の半透明で描画
+                        ctx.fillStyle = `rgba(${barColor.r}, ${barColor.g}, ${barColor.b}, 0.5)`;
                         ctx.fillRect(x, scanY, 1, 1);
-                    } else if (isColorMatch(pixel, BarAnalyzer.trackBackgroundColor)) {
-                        pixelFoundTrackBackgroundColor = true;
+                        break;
+                    }
+                    // レール背景色に一致するかチェック
+                    else if (isColorMatch(pixel, BarAnalyzer.trackBackgroundColor)) {
+                        isCurrentXATrackBackground = true;
+                        // デバッグ: レール背景色だと判断されたピクセルを、少し濃い灰色で描画
                         ctx.fillStyle = 'rgba(41, 33, 34, 0.5)';
                         ctx.fillRect(x, scanY, 1, 1);
                     }
                 }
 
                 // ロジックの修正点:
-                if (pixelFoundBarColor || pixelFoundBarEdgeColor) {
+                if (isCurrentXAnEdgePixel || isCurrentXABarPixel) {
                     // 現在のX座標の列でバー本体の色または縁の色が見つかった場合
-                    currentBarX = x; // バーの右端の候補としてそのX座標を更新
+                    // このX座標をバーの右端の候補として保持
+                    currentBarX = x; 
                     foundBarOrEdge = true; // バーが見つかった状態に遷移
-                } else if (foundBarOrEdge && pixelFoundTrackBackgroundColor) {
+                } else if (foundBarOrEdge && isCurrentXATrackBackground) {
                     // 既にバーまたは縁が見つかっている状態 (`foundBarOrEdge` が `true`) で、
                     // かつ現在のX座標の列でバー関連の色が見つからず、**レール背景色が見つかった場合**。
                     // これはバーの終端を越えて背景に戻ったことを意味するので、ループを終了する。
