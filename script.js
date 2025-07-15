@@ -146,7 +146,7 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
     // UI境界検出専用の色の許容範囲（uiBorderColorとisColorMatchで使う）
     // uiBorderColorとbarEdgeColorの区別が難しい場合でも、ここを調整して試してください。
     // まずは50-100程度から試すのが良いかもしれません。
-    uiBorderTolerance: 100, // <-- ここを調整してテストしてみてください。（UI外枠検出用）
+    uiBorderTolerance: 250, // <-- ここを調整してテストしてみてください。（UI外枠検出用）
 
     // バーの縁の色 (RGB) - ここを実際の白い縁の色に設定してください！
     barEdgeColor: { r: 255, g: 255, b: 255 }, // 例: 真っ白の場合。正確なRGB値を画像から取得して設定してください。
