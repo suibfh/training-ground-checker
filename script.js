@@ -134,7 +134,7 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
 
     // UIの外枠の色 (白っぽい色)
     // IMPORTANT: このRGB値も、画像からスポイトツールで正確に取得し、更新してください！
-    uiBorderColor: { r: 255, g: 250, b: 240 }, // <-- この値を画像から正確に取得して設定してください！
+    uiBorderColor: { r: 185, g: 185, b: 185 }, // <-- この値を画像から正確に取得して設定してください！
 
     // generalBackgroundColor はUI境界検出では使わないためコメントアウトまたは削除
     // generalBackgroundColor: { r: 79, g: 60, b: 31 },
@@ -146,7 +146,7 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
     // UI境界検出専用の色の許容範囲（uiBorderColorとisColorMatchで使う）
     // uiBorderColorとbarEdgeColorの区別が難しい場合でも、ここを調整して試してください。
     // まずは50-100程度から試すのが良いかもしれません。
-    uiBorderTolerance: 150, // <-- ここを調整してテストしてみてください。（UI外枠検出用）
+    uiBorderTolerance: 100, // <-- ここを調整してテストしてみてください。（UI外枠検出用）
 
     // バーの縁の色 (RGB) - ここを実際の白い縁の色に設定してください！
     barEdgeColor: { r: 255, g: 255, b: 255 }, // 例: 真っ白の場合。正確なRGB値を画像から取得して設定してください。
