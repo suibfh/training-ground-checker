@@ -141,7 +141,7 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
 
     // 色の許容範囲 (RGB各成分の差の絶対値の合計)
     // まずは大きくしてバーが検出されるか確認し、その後最適な値に調整してください。
-    colorTolerance: 150, // <-- ここを調整してテストしてみてください。（バーの色検出用）
+    colorTolerance: 200, // <-- ここを調整してテストしてみてください。（バーの色検出用）
 
     // UI境界検出専用の色の許容範囲（uiBorderColorとisColorMatchで使う）
     // uiBorderColorとbarEdgeColorの区別が難しい場合でも、ここを調整して試してください。
