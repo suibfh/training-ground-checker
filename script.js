@@ -201,7 +201,7 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
     BAR_100PERCENT_LINE_SCAN_X_END_RELATIVE_UI_RATIO: 0.84,    // UIの左端からUI幅の84%の位置 (右から16%内側)
 
     // 計算結果に加算する調整値（%）
-    PERCENTAGE_ADJUSTMENT: -0.8, // 例えば1.8%を加算
+    PERCENTAGE_ADJUSTMENT: -0.9, // 例えば1.8%を加算
 };
 
 // バー名の表示用マッピング
