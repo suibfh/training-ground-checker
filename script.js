@@ -175,10 +175,16 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
         spd: 0.915  // 敏捷バーの中心
     },
 
-    // レールの開始X座標 (UI幅に対する相対位置)
+    // レールの開始X座標 (UI幅に対する相対位置) - フォールバック用として残しておく
     RAIL_START_X_RELATIVE_UI_RATIO: 0.17,
     // レールの終了X座標 (UI幅に対する相対位置)
     RAIL_END_X_RELATIVE_UI_RATIO: 0.77, // 100%時のバーの右端の比率 (フォールバック用)
+
+    // ★追加: バーの左端の縦線を検出するためのX軸スキャン範囲 (UI幅に対する相対比率)
+    // UIの左端からUI幅の相対位置で指定。
+    // 例: UI幅の10%から30%までをスキャン (各バーの名称の右側の縦線が含まれるように調整)
+    BAR_LEFT_LINE_SCAN_X_START_RELATIVE_UI_RATIO: 0.10, // UIの左端からUI幅の10%の位置
+    BAR_LEFT_LINE_SCAN_X_END_RELATIVE_UI_RATIO: 0.30,   // UIの左端からUI幅の30%の位置
 
     // バーの走査開始X座標 (レールの開始Xからの相対比率)
     BAR_SCAN_START_X_RELATIVE_RAIL_RATIO: 0,
@@ -191,16 +197,19 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
 
     // バーの白い下ラインをスキャンするY軸の相対比率 (UIの高さに対する)
     BAR_BOTTOM_LINE_SCAN_Y_START_RELATIVE_UI_RATIO: 0.16, // UI上端から16%
-    BAR_BOTTOM_LINE_SCAN_Y_END_RELATIVE_UI_RATIO: 0.50,   // UI上端から50%まで
+    BAR_BOTTOM_LINE_SCAN_Y_END_RELATIVE_UI_RATIO: 0.50,    // UI上端から50%まで
 
     // ★追加: 100%バーラインを検出するためのX軸スキャン範囲 (UI幅に対する相対比率)
     // UIの左端からUI幅の相対位置で指定。
     // 例: UI幅の50%から84%までをスキャン (右端から16% ~ 50%内側)
     BAR_100PERCENT_LINE_SCAN_X_START_RELATIVE_UI_RATIO: 0.50, // UIの左端からUI幅の50%の位置 (右から50%内側)
-    BAR_100PERCENT_LINE_SCAN_X_END_RELATIVE_UI_RATIO: 0.84,   // UIの左端からUI幅の84%の位置 (右から16%内側)
+    BAR_100PERCENT_LINE_SCAN_X_END_RELATIVE_UI_RATIO: 0.84,    // UIの左端からUI幅の84%の位置 (右から16%内側)
 
     // 計算結果に加算する調整値（%）
-    PERCENTAGE_ADJUSTMENT: -0.8, // 例えば1.8%を加算
+    // Math.floor() と組み合わせる場合、0 またはごくわずかなプラス値（例: 0.001）で十分です。
+    // これまでの経験から、-0.8 のようなマイナス補正は Math.ceil() と組み合わせて切り上げ抑制に使うものでした。
+    // Math.floor() に変更したため、基本的に不要になります。
+    PERCENTAGE_ADJUSTMENT: 0, 
 };
 
 /**
@@ -406,8 +415,75 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
             // UI内でのバーの中心Y座標 (Canvas座標)
             const barY = uiTop + Math.floor(uiHeight * relativeYRatio);
 
-            // レールの開始X (Canvas座標) は既存のものを利用
-            const railStartX = uiLeft + Math.floor(uiWidth * BarAnalyzer.RAIL_START_X_RELATIVE_UI_RATIO);
+            // ★★★ 変更: railStartX を「縦の白い線」で検出するロジック ★★★
+            let dynamicRailStartX = -1;
+
+            // 各バーのY軸スキャン範囲
+            const scanYStartForRailLine = barY - BarAnalyzer.BAR_SCAN_Y_RANGE;
+            const scanYEndForRailLine = barY + BarAnalyzer.BAR_SCAN_Y_RANGE;
+
+            // X軸スキャン範囲: UIの左端から、バーの通常の開始位置より少し右まで
+            // BarAnalyzer.BAR_LEFT_LINE_SCAN_X_START_RELATIVE_UI_RATIO / BarAnalyzer.BAR_LEFT_LINE_SCAN_X_END_RELATIVE_UI_RATIO を使用
+            const scanXStartForRailLine = uiLeft + Math.floor(uiWidth * BarAnalyzer.BAR_LEFT_LINE_SCAN_X_START_RELATIVE_UI_RATIO);
+            const scanXEndForRailLine = uiLeft + Math.floor(uiWidth * BarAnalyzer.BAR_LEFT_LINE_SCAN_X_END_RELATIVE_UI_RATIO);
+
+            // デバッグ: railStartXスキャンY範囲とX範囲を描画 (黄緑の点線)
+            ctx.strokeStyle = 'rgba(128, 255, 0, 0.5)';
+            ctx.setLineDash([2, 2]);
+            ctx.beginPath();
+            ctx.moveTo(scanXStartForRailLine, scanYStartForRailLine);
+            ctx.lineTo(scanXEndForRailLine, scanYStartForRailLine);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(scanXStartForRailLine, scanYEndForRailLine);
+            ctx.lineTo(scanXEndForRailLine, scanYEndForRailLine);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(scanXStartForRailLine, scanYStartForRailLine);
+            ctx.lineTo(scanXStartForRailLine, scanYEndForRailLine);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(scanXEndForRailLine, scanYStartForRailLine);
+            ctx.lineTo(scanXEndForRailLine, scanYEndForRailLine);
+            ctx.stroke();
+            ctx.setLineDash([]); // 点線をリセット
+
+            // 左から右へスキャンして、バーの左端の白いラインの左端を見つける
+            for (let x = scanXStartForRailLine; x <= scanXEndForRailLine; x++) {
+                let foundWhiteLinePixelInColumn = false;
+                for (let y = scanYStartForRailLine; y <= scanYEndForRailLine; y++) {
+                    const pixel = getPixelColor(imageData, x, y);
+                    // バーの白い縁の色 (barEdgeColor) をターゲットに、uiBorderToleranceを使用
+                    if (pixel && isColorMatch(pixel, BarAnalyzer.barEdgeColor, BarAnalyzer.uiBorderTolerance)) {
+                        foundWhiteLinePixelInColumn = true;
+                        // デバッグ描画: 検出された白い線を水色で描画
+                        ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
+                        ctx.fillRect(x, y, 1, 1);
+                        break;
+                    }
+                }
+                if (foundWhiteLinePixelInColumn) {
+                    dynamicRailStartX = x; // このX座標がレールの開始点の候補
+                    break; // 見つかったらループ終了
+                }
+            }
+
+            // 検出できなかった場合のフォールバック
+            if (dynamicRailStartX === -1) {
+                console.warn(`[WARN] バーの左端線が検出できませんでした (${barName})。固定のRAIL_START_X_RELATIVE_UI_RATIOを使用します。`);
+                dynamicRailStartX = uiLeft + Math.floor(uiWidth * BarAnalyzer.RAIL_START_X_RELATIVE_UI_RATIO);
+            }
+            const railStartX = dynamicRailStartX; // これを実際の railStartX として使用
+
+            // デバッグ: 検出された railStartX に黄色の線を引く
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'; // 黄色の線
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(railStartX, barY - 10);
+            ctx.lineTo(railStartX, barY + 10);
+            ctx.stroke();
+            // ★★★ railStartX 検出ロジックここまで ★★★
+
 
             // ★★★★ ここから新しい 100%地点（actualTrackEndX）の検出ロジック ★★★★
             let actualTrackEndX = -1;
@@ -485,7 +561,7 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
 
             // バーの右端X座標を見つける (既存のロジック)
             let currentBarX = railStartX; // 初期値はレールの開始点
-            let scanningBar = false;     // バーの色または縁の色をスキャン中かどうかのフラグ
+            let scanningBar = false;      // バーの色または縁の色をスキャン中かどうかのフラグ
 
             // バーの走査範囲 (レールの幅に対する相対座標を実際のピクセルに変換)
             const scanPixelStartX = railStartX + Math.floor(railLength * BarAnalyzer.BAR_SCAN_START_X_RELATIVE_RAIL_RATIO);
@@ -554,14 +630,11 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
             // 調整値を加算
             percentage += BarAnalyzer.PERCENTAGE_ADJUSTMENT;
 
-            // 最大100%に制限 (切り上げ前に制限)
-            percentage = Math.min(100, percentage);
+            // Math.floor() で切り捨て
+            percentage = Math.floor(percentage);
 
-            // 小数点なしで切り上げ (Math.ceil() は小数点以下を切り上げる)
-            percentage = Math.ceil(percentage);
-
-            // 再度、最大100%に制限 (切り上げ後に100を超えた場合のため)
-            percentage = Math.min(100, percentage);
+            // 最終的に0-100の範囲に制限
+            percentage = Math.min(100, Math.max(0, percentage));
             
             results[barName] = percentage.toFixed(0); // 小数点以下なしに変更
 
