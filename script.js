@@ -177,7 +177,7 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
 
     // レールの開始X座標 (UI幅に対する相対位置)
     // この値は globalRailStartX が検出できなかった場合のフォールバックとしてのみ使用されます
-    RAIL_START_X_RELATIVE_UI_RATIO: 0.17, 
+    RAIL_START_X_RELATIVE_UI_RATIO: 0.10, 
     // レールの終了X座標 (UI幅に対する相対位置)
     RAIL_END_X_RELATIVE_UI_RATIO: 0.77, // 100%時のバーの右端の比率 (フォールバック用)
 
