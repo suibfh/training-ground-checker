@@ -134,7 +134,7 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
 
     // UIの外枠の色 (白っぽい色)
     // IMPORTANT: このRGB値も、画像からスポイトツールで正確に取得し、更新してください！
-    uiBorderColor: { r: 254, g: 255, b: 255 }, // <-- この値を画像から正確に取得して設定してください！
+    uiBorderColor: { r: 255, g: 250, b: 240 }, // <-- この値を画像から正確に取得して設定してください！
 
     // generalBackgroundColor はUI境界検出では使わないためコメントアウトまたは削除
     // generalBackgroundColor: { r: 79, g: 60, b: 31 },
