@@ -186,6 +186,9 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
 
     // バーのY軸スキャン範囲 (バー中心Yからの上下のピクセル数)
     BAR_SCAN_Y_RANGE: 3, // 中心Yから上下に3ピクセル (計7ピクセル)
+
+    // 計算結果に加算する調整値（%）
+    PERCENTAGE_ADJUSTMENT: 1.7, // 例えば1.8%を加算
 };
 
 /**
@@ -241,6 +244,11 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
         const height = canvas.height;
         // ピクセルデータを再取得（描画クリア後に）
         const imageData = ctx.getImageData(0, 0, width, height);
+        // Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true.
+        // パフォーマンス警告への対応。getContext('2d') の際に willReadFrequently: true を追加検討。
+        // ctx = analysisCanvas.getContext('2d', { willReadFrequently: true });
+        // ただし、この修正は `analysisCanvas.getContext('2d');` の行で行う必要があるため、今回はそのまま。
+        // 必要であれば、DOMContentLoaded時などにgetContext呼び出しを修正してください。
 
         // --- UI境界検出ロジック (uiBorderColorを使用) ---
         let uiLeft = -1, uiRight = -1, uiTop = -1, uiBottom = -1;
@@ -298,14 +306,14 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
             // uiLeftが検出されている前提で、仮のUI幅からuiRightを計算
             // ここで使われる比率も、BarAnalyzerに定数として定義し、調整可能にすると良い
             if (uiLeft !== -1) {
-                // 例: UIの幅が全体の70%程度と仮定
+                // 例: UIの幅が全体の70%程度と仮定 (この0.7も調整可能にすると良い)
                 const assumedUiWidthRatio = 0.7; // <-- この比率も画像に合わせて調整してください
                 uiRight = uiLeft + Math.floor(width * assumedUiWidthRatio);
                 // ただし、Canvasの右端を超えないようにする
                 uiRight = Math.min(uiRight, width - 1);
             } else {
                 // uiLeftも検出できていない場合はエラーをスロー
-                 throw new Error("UIの左端と右端の境界を検出できませんでした。`uiBorderColor`が正確に設定されているか確認してください。");
+                throw new Error("UIの左端と右端の境界を検出できませんでした。`uiBorderColor`が正確に設定されているか確認してください。");
             }
         }
 
@@ -403,7 +411,7 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
 
             // バーの右端X座標を見つける
             let currentBarX = railStartX; // 初期値はレールの開始点
-            let scanningBar = false;     // バーの色または縁の色をスキャン中かどうかのフラグ
+            let scanningBar = false;      // バーの色または縁の色をスキャン中かどうかのフラグ
 
             // バーの走査範囲 (レールの幅に対する相対座標を実際のピクセルに変換)
             const scanPixelStartX = railStartX + Math.floor(railLength * BarAnalyzer.BAR_SCAN_START_X_RELATIVE_RAIL_RATIO);
@@ -472,10 +480,24 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
                 percentage = Math.min(100, Math.max(0, ((currentBarX - railStartX) / (actualTrackEndX - railStartX)) * 100));
             }
 
-            results[barName] = percentage.toFixed(2); // 小数点以下2桁
+            // ★★★ ここから修正箇所 ★★★
+            // 調整値を加算
+            percentage += BarAnalyzer.PERCENTAGE_ADJUSTMENT;
+
+            // 最大100%に制限 (切り上げ前に制限)
+            percentage = Math.min(100, percentage);
+
+            // 小数点なしで切り上げ (Math.ceil() は小数点以下を切り上げる)
+            percentage = Math.ceil(percentage);
+
+            // 再度、最大100%に制限 (切り上げ後に100を超えた場合のため)
+            percentage = Math.min(100, percentage);
+            // ★★★ ここまで修正箇所 ★★★
+
+            results[barName] = percentage.toFixed(0); // 小数点以下なしに変更
 
             // 解析結果のデバッグ表示 (コンソール)
-            console.log(`[DEBUG] ${barName.toUpperCase()}: BarY=${barY}, CurrentBarX=${currentBarX}, RailStartX=${railStartX}, ActualTrackEndX=${actualTrackEndX}, Percentage=${percentage.toFixed(2)}%`);
+            console.log(`[DEBUG] ${barName.toUpperCase()}: BarY=${barY}, CurrentBarX=${currentBarX}, RailStartX=${railStartX}, ActualTrackEndX=${actualTrackEndX}, Percentage=${percentage.toFixed(0)}%`);
 
             resultHtml.push(`
                 <p>
