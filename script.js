@@ -192,13 +192,13 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
 
     // バーの白い下ラインをスキャンするY軸の相対比率 (UIの高さに対する)
     BAR_BOTTOM_LINE_SCAN_Y_START_RELATIVE_UI_RATIO: 0.16, // UI上端から16%
-    BAR_BOTTOM_LINE_SCAN_Y_END_RELATIVE_UI_RATIO: 0.50,   // UI上端から50%まで
+    BAR_BOTTOM_LINE_SCAN_Y_END_RELATIVE_UI_RATIO: 0.50,    // UI上端から50%まで
 
     // ★追加: 100%バーラインを検出するためのX軸スキャン範囲 (UI幅に対する相対比率)
     // UIの左端からUI幅の相対位置で指定。
     // 例: UI幅の50%から84%までをスキャン (右端から16% ~ 50%内側)
     BAR_100PERCENT_LINE_SCAN_X_START_RELATIVE_UI_RATIO: 0.50, // UIの左端からUI幅の50%の位置 (右から50%内側)
-    BAR_100PERCENT_LINE_SCAN_X_END_RELATIVE_UI_RATIO: 0.84,   // UIの左端からUI幅の84%の位置 (右から16%内側)
+    BAR_100PERCENT_LINE_SCAN_X_END_RELATIVE_UI_RATIO: 0.84,    // UIの左端からUI幅の84%の位置 (右から16%内側)
 
     // 計算結果に加算する調整値（%）
     PERCENTAGE_ADJUSTMENT: -0.8, // 例えば1.8%を加算
@@ -277,9 +277,10 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
                 // UI境界検出には BarAnalyzer.uiBorderTolerance を使用
                 if (pixelColor && isColorMatch(pixelColor, BarAnalyzer.uiBorderColor, BarAnalyzer.uiBorderTolerance)) {
                     foundBorder = true;
-                    // デバッグ: 白い枠と判断されたピクセルにマゼンタの点を描画
-                    ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
-                    ctx.fillRect(x, y, 1, 1);
+                    // --- 補助線描画: UI左端検出ピクセル (マゼンタの点) ---
+                    // ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
+                    // ctx.fillRect(x, y, 1, 1);
+                    // --- 補助線描画ここまで ---
                     break; // このX座標で枠が見つかったら次のXへ
                 }
             }
@@ -300,9 +301,10 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
                 // UI境界検出には BarAnalyzer.uiBorderTolerance を使用
                 if (pixelColor && isColorMatch(pixelColor, BarAnalyzer.uiBorderColor, BarAnalyzer.uiBorderTolerance)) {
                     foundBorder = true;
-                    // デバッグ: 白い枠と判断されたピクセルにマゼンタの点を描画
-                    ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
-                    ctx.fillRect(x, y, 1, 1);
+                    // --- 補助線描画: UI右端検出ピクセル (マゼンタの点) ---
+                    // ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
+                    // ctx.fillRect(x, y, 1, 1);
+                    // --- 補助線描画ここまで ---
                     break;
                 }
             }
@@ -340,9 +342,10 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
                 // UI境界検出には BarAnalyzer.uiBorderTolerance を使用
                 if (pixelColor && isColorMatch(pixelColor, BarAnalyzer.uiBorderColor, BarAnalyzer.uiBorderTolerance)) {
                     foundBorder = true;
-                    // デバッグ: 白い枠と判断されたピクセルにマゼンタの点を描画
-                    ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
-                    ctx.fillRect(x, y, 1, 1);
+                    // --- 補助線描画: UI上端検出ピクセル (マゼンタの点) ---
+                    // ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
+                    // ctx.fillRect(x, y, 1, 1);
+                    // --- 補助線描画ここまで ---
                     break;
                 }
             }
@@ -360,9 +363,10 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
                 // UI境界検出には BarAnalyzer.uiBorderTolerance を使用
                 if (pixelColor && isColorMatch(pixelColor, BarAnalyzer.uiBorderColor, BarAnalyzer.uiBorderTolerance)) {
                     foundBorder = true;
-                    // デバッグ: 白い枠と判断されたピクセルにマゼンタの点を描画
-                    ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
-                    ctx.fillRect(x, y, 1, 1);
+                    // --- 補助線描画: UI下端検出ピクセル (マゼンタの点) ---
+                    // ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
+                    // ctx.fillRect(x, y, 1, 1);
+                    // --- 補助線描画ここまで ---
                     break;
                 }
             }
@@ -390,10 +394,11 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
         const uiWidth = uiRight - uiLeft + 1;
         const uiHeight = uiBottom - uiTop + 1;
 
-        // デバッグ: 確定したUI境界を赤い線で描画
-        ctx.strokeStyle = 'red';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(uiLeft, uiTop, uiWidth, uiHeight);
+        // --- 補助線描画: 確定したUI境界 (赤い線) ---
+        // ctx.strokeStyle = 'red';
+        // ctx.lineWidth = 2;
+        // ctx.strokeRect(uiLeft, uiTop, uiWidth, uiHeight);
+        // --- 補助線描画ここまで ---
 
         // ★★★★ グローバルなrailStartXの検出ロジック ★★★★
         let globalRailStartX = -1;
@@ -418,26 +423,27 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
         // もし画像でステータス名の右側にある空白部分の左端の比率が必要な場合、新しい定数を定義してください。
         const scanXEndForGlobalRail = uiLeft + Math.floor(uiWidth * BarAnalyzer.RAIL_START_X_RELATIVE_UI_RATIO); // レールの開始X比率を左端として使用
 
-        // デバッグ: グローバルrailStartXスキャンY範囲とX範囲を描画 (黄緑の点線)
-        ctx.strokeStyle = 'rgba(128, 255, 0, 0.5)';
-        ctx.setLineDash([2, 2]);
-        ctx.beginPath();
-        ctx.moveTo(scanXStartForGlobalRail, scanYStartForGlobalRailLine);
-        ctx.lineTo(scanXEndForGlobalRail, scanYStartForGlobalRailLine);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(scanXStartForGlobalRail, scanYEndForGlobalRailLine);
-        ctx.lineTo(scanXEndForGlobalRail, scanYEndForGlobalRailLine);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(scanXStartForGlobalRail, scanYStartForGlobalRailLine);
-        ctx.lineTo(scanXStartForGlobalRail, scanYEndForGlobalRailLine);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(scanXEndForGlobalRail, scanYStartForGlobalRailLine);
-        ctx.lineTo(scanXEndForGlobalRail, scanYEndForGlobalRailLine);
-        ctx.stroke();
-        ctx.setLineDash([]); // 点線をリセット
+        // --- 補助線描画: グローバルrailStartXスキャンY範囲とX範囲 (黄緑の点線) ---
+        // ctx.strokeStyle = 'rgba(128, 255, 0, 0.5)';
+        // ctx.setLineDash([2, 2]);
+        // ctx.beginPath();
+        // ctx.moveTo(scanXStartForGlobalRail, scanYStartForGlobalRailLine);
+        // ctx.lineTo(scanXEndForGlobalRail, scanYStartForGlobalRailLine);
+        // ctx.stroke();
+        // ctx.beginPath();
+        // ctx.moveTo(scanXStartForGlobalRail, scanYEndForGlobalRailLine);
+        // ctx.lineTo(scanXEndForGlobalRail, scanYEndForGlobalRailLine);
+        // ctx.stroke();
+        // ctx.beginPath();
+        // ctx.moveTo(scanXStartForGlobalRail, scanYStartForGlobalRailLine);
+        // ctx.lineTo(scanXStartForGlobalRail, scanYEndForGlobalRailLine);
+        // ctx.stroke();
+        // ctx.beginPath();
+        // ctx.moveTo(scanXEndForGlobalRail, scanYStartForGlobalRailLine);
+        // ctx.lineTo(scanXEndForGlobalRail, scanYEndForGlobalRailLine);
+        // ctx.stroke();
+        // ctx.setLineDash([]); // 点線をリセット
+        // --- 補助線描画ここまで ---
 
         // 右から左へスキャンして白い線を見つける
         for (let x = scanXStartForGlobalRail; x >= scanXEndForGlobalRail; x--) {
@@ -447,10 +453,11 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
                 // バーの白い縁の色 (barEdgeColor) をターゲットに、uiBorderToleranceを使用
                 if (pixel && isColorMatch(pixel, BarAnalyzer.barEdgeColor, BarAnalyzer.uiBorderTolerance)) {
                     foundWhiteLinePixelInColumn = true;
-                    // デバッグ描画: 検出された白い線を水色で描画
-                    ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
-                    ctx.fillRect(x, y, 1, 1);
-                    break;
+                    // --- 補助線描画: 検出された白い線 (水色) ---
+                    // ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
+                    // ctx.fillRect(x, y, 1, 1);
+                    // --- 補助線描画ここまで ---
+                    break; // このX座標で白いピクセルが見つかったら、この列のYスキャンは終了
                 }
             }
             if (foundWhiteLinePixelInColumn) {
@@ -465,13 +472,14 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
             globalRailStartX = uiLeft + Math.floor(uiWidth * BarAnalyzer.RAIL_START_X_RELATIVE_UI_RATIO);
         }
 
-        // デバッグ: 検出された globalRailStartX に黄色の線を引く
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'; // 黄色の線
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(globalRailStartX, uiTop); // UIの高さ全体に線を引く
-        ctx.lineTo(globalRailStartX, uiBottom);
-        ctx.stroke();
+        // --- 補助線描画: 検出された globalRailStartX (黄色の線) ---
+        // ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'; // 黄色の線
+        // ctx.lineWidth = 2;
+        // ctx.beginPath();
+        // ctx.moveTo(globalRailStartX, uiTop); // UIの高さ全体に線を引く
+        // ctx.lineTo(globalRailStartX, uiBottom);
+        // ctx.stroke();
+        // --- 補助線描画ここまで ---
 
         console.log(`[DEBUG] Global Rail Start X detected at: ${globalRailStartX}`);
         // ★★★★ グローバルなrailStartXの検出ロジックここまで ★★★★
@@ -507,41 +515,43 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
             const scanXStartFor100PercentLine = uiLeft + Math.floor(uiWidth * BarAnalyzer.BAR_100PERCENT_LINE_SCAN_X_START_RELATIVE_UI_RATIO);
             const scanXEndFor100PercentLine = uiLeft + Math.floor(uiWidth * BarAnalyzer.BAR_100PERCENT_LINE_SCAN_X_END_RELATIVE_UI_RATIO);
 
-            // デバッグ: 100%ラインスキャンY範囲とX範囲を描画 (青い点線)
-            ctx.strokeStyle = 'rgba(0, 0, 255, 0.5)';
-            ctx.setLineDash([2, 2]); // 点線
-            ctx.beginPath();
-            // Y軸の2本の点線（X軸の検索範囲の開始から終了まで）
-            ctx.moveTo(scanXStartFor100PercentLine, scanYFor100PercentLineStart);
-            ctx.lineTo(scanXEndFor100PercentLine, scanYFor100PercentLineStart);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(scanXStartFor100PercentLine, scanYFor100PercentLineEnd);
-            ctx.lineTo(scanXEndFor100PercentLine, scanYFor100PercentLineEnd);
-            ctx.stroke();
-            // ★追加: X軸の2本の点線（Y軸の検索範囲の開始から終了まで）
-            ctx.beginPath();
-            ctx.moveTo(scanXEndFor100PercentLine, scanYFor100PercentLineStart);
-            ctx.lineTo(scanXEndFor100PercentLine, scanYFor100PercentLineEnd);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(scanXStartFor100PercentLine, scanYFor100PercentLineStart);
-            ctx.lineTo(scanXStartFor100PercentLine, scanYFor100PercentLineEnd);
-            ctx.stroke();
-            ctx.setLineDash([]); // 点線をリセット
+            // --- 補助線描画: 100%ラインスキャンY範囲とX範囲 (青い点線) ---
+            // ctx.strokeStyle = 'rgba(0, 0, 255, 0.5)';
+            // ctx.setLineDash([2, 2]); // 点線
+            // ctx.beginPath();
+            // // Y軸の2本の点線（X軸の検索範囲の開始から終了まで）
+            // ctx.moveTo(scanXStartFor100PercentLine, scanYFor100PercentLineStart);
+            // ctx.lineTo(scanXEndFor100PercentLine, scanYFor100PercentLineStart);
+            // ctx.stroke();
+            // ctx.beginPath();
+            // ctx.moveTo(scanXStartFor100PercentLine, scanYFor100PercentLineEnd);
+            // ctx.lineTo(scanXEndFor100PercentLine, scanYFor100PercentLineEnd);
+            // ctx.stroke();
+            // // ★追加: X軸の2本の点線（Y軸の検索範囲の開始から終了まで）
+            // ctx.beginPath();
+            // ctx.moveTo(scanXEndFor100PercentLine, scanYFor100PercentLineStart);
+            // ctx.lineTo(scanXEndFor100PercentLine, scanYFor100PercentLineEnd);
+            // ctx.stroke();
+            // ctx.beginPath();
+            // ctx.moveTo(scanXStartFor100PercentLine, scanYFor100PercentLineStart);
+            // ctx.lineTo(scanXStartFor100PercentLine, scanYFor100PercentLineEnd);
+            // ctx.stroke();
+            // ctx.setLineDash([]); // 点線をリセット
+            // --- 補助線描画ここまで ---
 
             // 右から左へスキャンして、100%の白いラインの右端を見つける
             for (let x = scanXEndFor100PercentLine; x >= scanXStartFor100PercentLine; x--) {
-                let foundWhiteLinePixelInColumn = false;
+                let foundWhiteLinePixelInColumn = false; // 現在のX座標の列で、白い線が見つかったか
                 // 指定されたY範囲で白いピクセルを探す
                 for (let y = scanYFor100PercentLineStart; y <= scanYFor100PercentLineEnd; y++) {
                     const pixel = getPixelColor(imageData, x, y);
                     // バーの白い縁の色 (barEdgeColor) をターゲットに
                     if (pixel && isColorMatch(pixel, BarAnalyzer.barEdgeColor, BarAnalyzer.colorTolerance)) { // colorToleranceで試す
                         foundWhiteLinePixelInColumn = true;
-                        // デバッグ描画: 100%ラインのピクセルを緑で描画
-                        ctx.fillStyle = 'rgba(0, 255, 0, 0.5)';
-                        ctx.fillRect(x, y, 1, 1);
+                        // --- 補助線描画: 100%ラインのピクセル (緑) ---
+                        // ctx.fillStyle = 'rgba(0, 255, 0, 0.5)';
+                        // ctx.fillRect(x, y, 1, 1);
+                        // --- 補助線描画ここまで ---
                         break; // このX座標で白いピクセルが見つかったら、この列のYスキャンは終了
                     }
                 }
@@ -576,16 +586,17 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
             const scanPixelEndX = actualTrackEndX;  
 
 
-            // デバッグ: バーY軸スキャンラインを描画 (薄い灰色)
-            ctx.strokeStyle = 'rgba(150, 150, 150, 0.3)';
-            ctx.lineWidth = 1;
-            for (let yOffset = -BarAnalyzer.BAR_SCAN_Y_RANGE; yOffset <= BarAnalyzer.BAR_SCAN_Y_RANGE; yOffset++) {
-                const currentScanY = barY + yOffset;
-                ctx.beginPath();
-                ctx.moveTo(scanPixelStartX, currentScanY);
-                ctx.lineTo(scanPixelEndX, currentScanY);
-                ctx.stroke();
-            }
+            // --- 補助線描画: バーY軸スキャンライン (薄い灰色) ---
+            // ctx.strokeStyle = 'rgba(150, 150, 150, 0.3)';
+            // ctx.lineWidth = 1;
+            // for (let yOffset = -BarAnalyzer.BAR_SCAN_Y_RANGE; yOffset <= BarAnalyzer.BAR_SCAN_Y_RANGE; yOffset++) {
+            //     const currentScanY = barY + yOffset;
+            //     ctx.beginPath();
+            //     ctx.moveTo(scanPixelStartX, currentScanY);
+            //     ctx.lineTo(scanPixelEndX, currentScanY);
+            //     ctx.stroke();
+            // }
+            // --- 補助線描画ここまで ---
 
             // 右へスキャンしてバーの終端を見つける
             for (let x = scanPixelStartX; x <= scanPixelEndX; x++) {
@@ -604,14 +615,16 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
                     if (isColorMatch(pixel, barColor) || isColorMatch(pixel, BarAnalyzer.barEdgeColor)) {
                         foundAnyBarRelatedPixelInColumn = true;
                         scanningBar = true; // バーの検出が始まった
-                        // デバッグ描画: バーの色だと判断されたピクセルを、そのバーの実際の色の半透明で描画
-                        ctx.fillStyle = `rgba(${barColor.r}, ${barColor.g}, ${barColor.b}, 0.5)`;
-                        ctx.fillRect(x, scanY, 1, 1);
+                        // --- 補助線描画: バーの色だと判断されたピクセル (半透明のバーの色) ---
+                        // ctx.fillStyle = `rgba(${barColor.r}, ${barColor.g}, ${barColor.b}, 0.5)`;
+                        // ctx.fillRect(x, scanY, 1, 1);
+                        // --- 補助線描画ここまで ---
                         break; // このX座標でバーまたは縁の色が見つかったら、このyOffsetのループは終了し、次のxへ
                     } else if (isColorMatch(pixel, BarAnalyzer.trackBackgroundColor)) {
-                            // デバッグ: レール背景色だと判断されたピクセルを、少し濃い灰色で描画
-                            ctx.fillStyle = 'rgba(41, 33, 34, 0.5)';
-                            ctx.fillRect(x, scanY, 1, 1);
+                        // --- 補助線描画: レール背景色だと判断されたピクセル (少し濃い灰色) ---
+                        // ctx.fillStyle = 'rgba(41, 33, 34, 0.5)';
+                        // ctx.fillRect(x, scanY, 1, 1);
+                        // --- 補助線描画ここまで ---
                     }
                 }
 
@@ -659,21 +672,23 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
             `);
 
             // (オプション) Canvasに解析結果をオーバーレイ描画
-            // バーの右端に線を引く
-            ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)'; // 赤い線
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(currentBarX, barY - 5);
-            ctx.lineTo(currentBarX, barY + 5);
-            ctx.stroke();
+            // --- 補助線描画: バーの右端 (赤い線) ---
+            // ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)'; // 赤い線
+            // ctx.lineWidth = 2;
+            // ctx.beginPath();
+            // ctx.moveTo(currentBarX, barY - 5);
+            // ctx.lineTo(currentBarX, barY + 5);
+            // ctx.stroke();
+            // --- 補助線描画ここまで ---
 
-            // ★追加: デバッグ: 検出されたactualTrackEndXに緑の線を引く
-            ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)'; // 緑の線
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(actualTrackEndX, barY - 10);
-            ctx.lineTo(actualTrackEndX, barY + 10);
-            ctx.stroke();
+            // --- 補助線描画: 検出されたactualTrackEndX (緑の線) ---
+            // ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)'; // 緑の線
+            // ctx.lineWidth = 2;
+            // ctx.beginPath();
+            // ctx.moveTo(actualTrackEndX, barY - 10);
+            // ctx.lineTo(actualTrackEndX, barY + 10);
+            // ctx.stroke();
+            // --- 補助線描画ここまで ---
         }
 
         resultsDisplay.innerHTML = resultHtml.join('');
