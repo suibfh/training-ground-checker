@@ -189,9 +189,15 @@ const BarAnalyzer = { // オブジェクトとしてまとめる
     // バーのY軸スキャン範囲 (バー中心Yからの上下のピクセル数)
     BAR_SCAN_Y_RANGE: 3, // 中心Yから上下に3ピクセル (計7ピクセル)
 
-    // ★追加: 新規追加: バーの白い下ラインをスキャンするY軸の相対比率 (UIの高さに対する)
+    // バーの白い下ラインをスキャンするY軸の相対比率 (UIの高さに対する)
     BAR_BOTTOM_LINE_SCAN_Y_START_RELATIVE_UI_RATIO: 0.16, // UI上端から16%
     BAR_BOTTOM_LINE_SCAN_Y_END_RELATIVE_UI_RATIO: 0.50,   // UI上端から50%まで
+
+    // ★追加: 100%バーラインを検出するためのX軸スキャン範囲 (UI幅に対する相対比率)
+    // UIの左端からUI幅の相対位置で指定。
+    // 例: UI幅の50%から84%までをスキャン (右端から16% ~ 50%内側)
+    BAR_100PERCENT_LINE_SCAN_X_START_RELATIVE_UI_RATIO: 0.50, // UIの左端からUI幅の50%の位置 (右から50%内側)
+    BAR_100PERCENT_LINE_SCAN_X_END_RELATIVE_UI_RATIO: 0.84,   // UIの左端からUI幅の84%の位置 (右から16%内側)
 
     // 計算結果に加算する調整値（%）
     PERCENTAGE_ADJUSTMENT: 1.7, // 例えば1.8%を加算
@@ -414,19 +420,30 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
             // 100%ラインを検出するためのX軸スキャン範囲
             // UIの右端からrailStartXまでを右から左へスキャン
             // uiRight を基準にする (外枠の右端、またはフォールバックで計算されたuiRight)
-            const scanXStartFor100PercentLine = railStartX; // レール開始Xから
-            const scanXEndFor100PercentLine = uiRight;     // UI右端まで (外枠の右端、またはフォールバック値)
+            // ★変更: BAR_100PERCENT_LINE_SCAN_X_START_RELATIVE_UI_RATIO, BAR_100PERCENT_LINE_SCAN_X_END_RELATIVE_UI_RATIO を使用
+            const scanXStartFor100PercentLine = uiLeft + Math.floor(uiWidth * BarAnalyzer.BAR_100PERCENT_LINE_SCAN_X_START_RELATIVE_UI_RATIO);
+            const scanXEndFor100PercentLine = uiLeft + Math.floor(uiWidth * BarAnalyzer.BAR_100PERCENT_LINE_SCAN_X_END_RELATIVE_UI_RATIO);
 
-            // デバッグ: 100%ラインスキャンY範囲を描画 (青い点線)
+            // デバッグ: 100%ラインスキャンY範囲とX範囲を描画 (青い点線)
             ctx.strokeStyle = 'rgba(0, 0, 255, 0.5)';
             ctx.setLineDash([2, 2]); // 点線
             ctx.beginPath();
+            // Y軸の2本の点線（X軸の検索範囲の開始から終了まで）
             ctx.moveTo(scanXStartFor100PercentLine, scanYFor100PercentLineStart);
             ctx.lineTo(scanXEndFor100PercentLine, scanYFor100PercentLineStart);
             ctx.stroke();
             ctx.beginPath();
             ctx.moveTo(scanXStartFor100PercentLine, scanYFor100PercentLineEnd);
             ctx.lineTo(scanXEndFor100PercentLine, scanYFor100PercentLineEnd);
+            ctx.stroke();
+            // ★追加: X軸の2本の点線（Y軸の検索範囲の開始から終了まで）
+            ctx.beginPath();
+            ctx.moveTo(scanXEndFor100PercentLine, scanYFor100PercentLineStart);
+            ctx.lineTo(scanXEndFor100PercentLine, scanYFor100PercentLineEnd);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(scanXStartFor100PercentLine, scanYFor100PercentLineStart);
+            ctx.lineTo(scanXStartFor100PercentLine, scanYFor100PercentLineEnd);
             ctx.stroke();
             ctx.setLineDash([]); // 点線をリセット
 
@@ -472,7 +489,7 @@ async function analyzeImage(canvas, originalImage, originalImageWidth, originalI
 
             // バーの走査範囲 (レールの幅に対する相対座標を実際のピクセルに変換)
             const scanPixelStartX = railStartX + Math.floor(railLength * BarAnalyzer.BAR_SCAN_START_X_RELATIVE_RAIL_RATIO);
-            // ★修正: scanPixelEndX を railEndX (既存) から actualTrackEndX (新しく検出された100%地点) に変更★
+            // scanPixelEndX を railEndX (既存) から actualTrackEndX (新しく検出された100%地点) に変更
             const scanPixelEndX = actualTrackEndX; 
 
 
